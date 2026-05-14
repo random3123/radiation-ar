@@ -1,165 +1,258 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>실시간 카메라 거리 측정</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <title>Radiation AR Pro (Full Source)</title>
+    <!-- A-Frame 라이브러리: 3D 좌표 및 수학 계산용 -->
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <style>
-        body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: sans-serif; }
-        #ui-layer {
-            position: absolute; top: 30px; left: 50%; transform: translateX(-50%);
-            width: 80%; z-index: 100; pointer-events: none;
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: #000; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
         }
-        .glass-card {
-            background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(10px);
-            border-radius: 20px; padding: 20px; color: white; text-align: center;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+        
+        /* 실시간 카메라 비디오 배경 */
+        #video-background {
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%;
+            object-fit: cover; 
+            z-index: -1;
         }
-        #distance { font-size: 40px; font-weight: 800; color: #00e676; margin: 5px 0; }
-        #status { font-size: 14px; color: #bbb; }
-        #controls { position: absolute; bottom: 50px; width: 100%; display: flex; justify-content: center; z-index: 100; }
-        .btn {
-            padding: 18px 35px; border-radius: 50px; border: none; font-weight: bold;
-            font-size: 16px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+
+        /* 상단 UI 헤더 */
+        #ui-header { 
+            position: fixed; 
+            top: 20px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            width: 85%; 
+            background: rgba(0,0,0,0.8); 
+            border: 1px solid #00f2ff; 
+            padding: 15px; 
+            border-radius: 15px; 
+            color: white; 
+            text-align: center; 
+            z-index: 1000; 
+            pointer-events: none; 
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
         }
-        #ar-btn { background: #00e676; color: black; }
-        #reset-btn { background: #ff5252; color: white; display: none; }
+        .dose-val { 
+            font-size: 36px; 
+            color: #00ff00; 
+            font-weight: bold; 
+            font-family: 'Courier New', Courier, monospace; 
+            margin: 5px 0;
+        }
+        
+        /* 하단 컨트롤 패널 */
+        #control-panel { 
+            position: fixed; 
+            bottom: 30px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            width: 85%; 
+            background: rgba(20,20,20,0.9); 
+            padding: 15px; 
+            border-radius: 15px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+            z-index: 1001; 
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+        }
+        input { 
+            background: #333; 
+            color: white; 
+            border: 1px solid #555; 
+            padding: 12px; 
+            border-radius: 8px; 
+            text-align: center; 
+            font-size: 16px; 
+            width: 100%; 
+            box-sizing: border-box; 
+        }
+        
+        .btn-group { 
+            display: flex; 
+            gap: 10px; 
+        }
+        button { 
+            flex: 1; 
+            padding: 14px; 
+            border-radius: 8px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            font-size: 14px; 
+            border: none; 
+            transition: all 0.2s;
+        }
+        #btn-sensor { background: #ffc107; color: black; }
+        #btn-sensor:active { background: #e0a800; }
+        #btn-start { background: #28a745; color: white; }
+        #btn-start:active { background: #1e7e34; }
+        .btn-reset { background: #444; color: white; font-size: 12px; padding: 10px; }
+
+        /* 화면 중앙 조준점 */
+        #crosshair { 
+            position: fixed; 
+            top: 50%; 
+            left: 50%; 
+            width: 24px; 
+            height: 24px; 
+            border: 2px solid rgba(255, 255, 255, 0.8); 
+            border-radius: 50%; 
+            transform: translate(-50%, -50%); 
+            z-index: 999; 
+            pointer-events: none; 
+        }
+        #crosshair::after { 
+            content: ''; 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            width: 4px; 
+            height: 4px; 
+            background: #00f2ff; 
+            border-radius: 50%; 
+            transform: translate(-50%, -50%); 
+        }
     </style>
 </head>
 <body>
+    <!-- 카메라 렌더링용 비디오 태그 -->
+    <video id="video-background" autoplay playsinline></video>
 
-    <div id="ui-layer">
-        <div class="glass-card">
-            <div id="status">AR 시작 버튼을 눌러주세요</div>
-            <div id="distance">0.00 m</div>
+    <!-- 조준점 UI -->
+    <div id="crosshair"></div>
+
+    <!-- 상태창 UI -->
+    <div id="ui-header">
+        <div id="status" style="color:#00f2ff; font-size:12px;">지점을 조준하고 측정을 시작하세요</div>
+        <div class="dose-val"><span id="dose-display">0.00</span> <small style="font-size:16px;">mSv/hr</small></div>
+        <div id="dist-display" style="color:#ddd; font-size:14px; margin-top:5px;">거리: 0.00 m</div>
+    </div>
+
+    <!-- 조작부 UI -->
+    <div id="control-panel">
+        <div style="color: #aaa; font-size: 11px; text-align: center;">기준 선량 입력 (mSv/hr)</div>
+        <input type="number" id="dose-input" value="10" step="0.1">
+        
+        <div class="btn-group">
+            <button id="btn-sensor" onclick="initCameraAndSensors()">1. 카메라/센서 허용</button>
+            <button id="btn-start" onclick="startMeasurement()">2. 측정 시작</button>
         </div>
+        <button class="btn-reset" onclick="location.reload()">초기화 및 카메라 재시작</button>
     </div>
 
-    <div id="controls">
-        <button id="ar-btn" class="btn">AR 카메라 시작</button>
-        <button id="reset-btn" class="btn">다시 측정 (지점 초기화)</button>
-    </div>
+    <!-- 3D 좌표 계산용 가상 장면 (배경 투명) -->
+    <a-scene embedded vr-mode-ui="enabled: false" style="background: transparent;">
+        <!-- 카메라 엔티티: 기기 회전 및 위치를 추적 -->
+        <a-entity id="main-camera" camera look-controls position="0 1.6 0"></a-entity>
+    </a-scene>
 
-    <script type="module">
-        let camera, scene, renderer, controller;
-        let reticle, hitTestSource = null, hitTestSourceRequested = false;
-        let startPoint = null; // 고정된 첫 번째 지점
-        let line = null; // 실시간 연결 선
+    <script>
+        let baseDose = 0;
+        let isMeasuring = false;
+        let fixedSourcePos = new THREE.Vector3(); // 가상 공간에 고정될 선원 좌표
+        
+        const video = document.getElementById('video-background');
+        const doseDisplay = document.getElementById('dose-display');
+        const distDisplay = document.getElementById('dist-display');
+        const statusMsg = document.getElementById('status');
 
-        const statusEl = document.getElementById('status');
-        const distanceEl = document.getElementById('distance');
-        const arBtn = document.getElementById('ar-btn');
-        const resetBtn = document.getElementById('reset-btn');
+        /**
+         * 1단계: 카메라 및 센서 권한 요청
+         */
+        async function initCameraAndSensors() {
+            try {
+                // 후면 카메라 호출
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' }, 
+                    audio: false 
+                });
+                video.srcObject = stream;
+                
+                // iOS 등 기기 센서 권한 요청 (HTTPS 필수)
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    const permission = await DeviceOrientationEvent.requestPermission();
+                    if (permission !== 'granted') {
+                        alert("이동 감지를 위해 센서 권한이 필요합니다.");
+                        return;
+                    }
+                }
+                
+                statusMsg.innerText = "준비 완료! 사물을 조준하세요.";
+                const btnSensor = document.getElementById('btn-sensor');
+                btnSensor.innerText = "연결됨";
+                btnSensor.style.background = "#aaa";
+                btnSensor.disabled = true;
 
-        async function startAR() {
-            const session = await navigator.xr.requestSession('immersive-ar', {
-                requiredFeatures: ['hit-test']
-            });
-            
-            init(session);
-            arBtn.style.display = 'none';
-            resetBtn.style.display = 'block';
-            statusEl.innerText = "바닥을 스캔 후, 측정 시작점을 터치하세요";
-        }
-
-        function init(session) {
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-            
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.xr.enabled = true;
-            document.body.appendChild(renderer.domElement);
-
-            renderer.xr.setReferenceSpaceType('local');
-            renderer.xr.setSession(session);
-
-            controller = renderer.xr.getController(0);
-            controller.addEventListener('select', onSelect);
-            scene.add(controller);
-
-            // 조준점 (가이드)
-            reticle = new THREE.Mesh(
-                new THREE.RingGeometry(0.04, 0.05, 32).rotateX(-Math.PI / 2),
-                new THREE.MeshBasicMaterial({ color: 0x00e676 })
-            );
-            reticle.matrixAutoUpdate = false;
-            reticle.visible = false;
-            scene.add(reticle);
-
-            renderer.setAnimationLoop(render);
-        }
-
-        function onSelect() {
-            if (reticle.visible && !startPoint) {
-                // 첫 번째 지점 고정
-                startPoint = new THREE.Vector3();
-                startPoint.setFromMatrixPosition(reticle.matrix);
-
-                const sphere = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.02, 16, 16),
-                    new THREE.MeshBasicMaterial({ color: 0xffffff })
-                );
-                sphere.position.copy(startPoint);
-                scene.add(sphere);
-
-                statusEl.innerText = "기점 고정됨! 이제 움직여보세요.";
+            } catch (err) {
+                console.error(err);
+                alert("카메라를 켤 수 없습니다.\n1. HTTPS 접속 확인\n2. 브라우저 권한 허용 확인\n3. 크롬/사파리 사용 권장");
             }
         }
 
-        function render(timestamp, frame) {
-            if (frame) {
-                const referenceSpace = renderer.xr.getReferenceSpace();
-                const session = renderer.xr.getSession();
-
-                // 1. 바닥 인식 (Hit Test) logic
-                if (!hitTestSourceRequested) {
-                    session.requestReferenceSpace('viewer').then(ref => {
-                        session.requestHitTestSource({ space: ref }).then(src => hitTestSource = src);
-                    });
-                    hitTestSourceRequested = true;
-                }
-
-                if (hitTestSource) {
-                    const hitResults = frame.getHitTestResults(hitTestSource);
-                    if (hitResults.length > 0) {
-                        reticle.visible = true;
-                        reticle.matrix.fromArray(hitResults[0].getPose(referenceSpace).transform.matrix);
-                    } else {
-                        reticle.visible = false;
-                    }
-                }
-
-                // 2. 실시간 거리 계산 (고정점 vs 현재 카메라)
-                if (startPoint) {
-                    // XR 세션에서 현재 카메라(뷰어)의 위치 정보 가져오기
-                    const viewerPose = frame.getViewerPose(referenceSpace);
-                    if (viewerPose) {
-                        const cameraPos = new THREE.Vector3(
-                            viewerPose.transform.position.x,
-                            viewerPose.transform.position.y,
-                            viewerPose.transform.position.z
-                        );
-
-                        // 거리 계산
-                        const dist = startPoint.distanceTo(cameraPos);
-                        distanceEl.innerText = dist.toFixed(2) + " m";
-
-                        // 실시간 선 업데이트
-                        if (line) scene.remove(line);
-                        const geometry = new THREE.BufferGeometry().setFromPoints([startPoint, cameraPos]);
-                        line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0x00e676 }));
-                        scene.add(line);
-                    }
-                }
+        /**
+         * 2단계: 측정 지점 고정
+         */
+        function startMeasurement() {
+            const inputVal = document.getElementById('dose-input').value;
+            if(!inputVal || inputVal <= 0) {
+                alert("유효한 선량 값을 입력해주세요.");
+                return;
             }
-            renderer.render(scene, camera);
+            
+            baseDose = parseFloat(inputVal);
+            const cameraObj = document.getElementById('main-camera').object3D;
+
+            // 현재 카메라가 바라보고 있는 방향으로 1.5m 앞 지점을 계산하여 '좌표'로 고정
+            // 이 지점이 실제 사물(배관 등)이 있는 위치라고 가정함
+            const forward = new THREE.Vector3(0, 0, -1.5);
+            forward.applyQuaternion(cameraObj.quaternion);
+            
+            // 현재 카메라 위치 + 앞 방향 벡터 = 월드 좌표상의 선원 위치
+            fixedSourcePos.copy(cameraObj.position).add(forward);
+
+            isMeasuring = true;
+            statusMsg.innerText = "지점 고정됨! 뒤로 물러나며 확인하세요.";
+            statusMsg.style.color = "#00ff00";
         }
 
-        arBtn.addEventListener('click', startAR);
-        resetBtn.addEventListener('click', () => location.reload());
+        /**
+         * 실시간 렌더링 루프: 거리 및 선량 계산
+         */
+        function updateLoop() {
+            if (isMeasuring) {
+                const cam = document.getElementById('main-camera').object3D;
+                
+                // 처음에 고정했던 좌표(fixedSourcePos)와 현재 내 카메라(cam.position) 사이의 거리 계산
+                const dist = cam.position.distanceTo(fixedSourcePos);
+                
+                // 역자승 법칙 공식: I = I0 * (d0 / d)^2
+                // d0(기준거리)는 0.5m로 설정
+                const d0 = 0.5;
+                const effectiveDist = Math.max(dist, 0.1); // 0으로 나누기 방지 (최소 10cm)
+                const currentDose = baseDose * Math.pow((d0 / effectiveDist), 2);
+                
+                // UI 갱신
+                doseDisplay.innerText = currentDose.toFixed(2);
+                distDisplay.innerText = `거리: ${dist.toFixed(2)} m`;
+                
+                // 위험 수치 시각 효과 (15mSv/hr 이상일 때 빨간색)
+                doseDisplay.style.color = currentDose >= 15 ? "#ff3c3c" : "#00ff00";
+            }
+            requestAnimationFrame(updateLoop);
+        }
+
+        // 루프 시작
+        updateLoop();
     </script>
 </body>
 </html>
