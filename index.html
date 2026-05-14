@@ -125,8 +125,6 @@
 
 <script>
 let fixedSourcePos = new THREE.Vector3();
-let estimatedUserPos = new THREE.Vector3(0, 1.6, 0);
-let velocity = new THREE.Vector3(0, 0, 0);
 let motionActive = false;
 let lastMotionTime = null;
 
@@ -135,6 +133,10 @@ let targetLocked = false;
 let cumulativeDose = 0;
 let measurementStartTime = null;
 let lastFrameTime = null;
+
+// 실제 거리 추적용 (타겟 초기거리 0.5m)
+let currentDistance = 0.5;
+let forwardVelocity = 0;
 
 const MOTION_THRESHOLD = 0.35;
 const VELOCITY_DAMPING = 0.75;
@@ -166,7 +168,8 @@ async function initSensors() {
 function handleMotion(event) {
     if (!motionActive || !targetLocked) return;
 
-    const acc = event.accelerationIncludingGravity;
+    // gravity 제거된 실제 선형가속도 사용
+    const acc = event.acceleration;
     if (!acc) return;
 
     const now = performance.now();
@@ -178,46 +181,35 @@ function handleMotion(event) {
     const dt = (now - lastMotionTime) / 1000;
     lastMotionTime = now;
 
-    if (dt <= 0 || dt > 0.08) return;
+    if (dt <= 0 || dt > 0.1) return;
 
-    const cam = document.getElementById('main-camera').object3D;
+    // 스마트폰 전후 이동(z축)만 사용
+    let zAcc = Math.abs(acc.z) < 0.08 ? 0 : acc.z;
 
-    // 전후 이동(z축) 중심 추적: 거리 변화 안정성 강화
-    let zAcc = Math.abs(acc.z) < MOTION_THRESHOLD ? 0 : acc.z;
-
-    // 정지 상태
+    // 정지 상태면 속도 즉시 제거
     if (zAcc === 0) {
-        velocity.z = 0;
+        forwardVelocity = 0;
         return;
     }
 
-    // 전후 방향 기준으로만 이동 적용
-    const forward = new THREE.Vector3();
-    cam.getWorldDirection(forward);
-    forward.y = 0;
-    forward.normalize();
+    // 속도 계산
+    forwardVelocity += zAcc * dt;
 
-    // 속도 업데이트
-    velocity.z += zAcc * dt;
+    // 강한 감쇠
+    forwardVelocity *= 0.55;
 
-    // 감쇠
-    velocity.z *= 0.7;
-
-    // 최소 속도 제거
-    if (Math.abs(velocity.z) < STOP_THRESHOLD) {
-        velocity.z = 0;
+    // 미세 속도 제거
+    if (Math.abs(forwardVelocity) < 0.003) {
+        forwardVelocity = 0;
         return;
     }
 
-    // 실제 이동량 계산
-    const movementDistance = velocity.z * dt;
+    // 거리 업데이트
+    currentDistance += forwardVelocity * dt;
 
-    // 카메라 위치 이동
-    estimatedUserPos.add(
-        forward.clone().multiplyScalar(-movementDistance)
-    );
-
-    cam.position.copy(estimatedUserPos);
+    // 최소/최대 거리 제한
+    // 거리 제한: 최소 0.5m, 최대 10m
+    currentDistance = Math.max(0.5, Math.min(currentDistance, 10));
 }
 
 function lockTarget() {
@@ -225,13 +217,11 @@ function lockTarget() {
 
     const cam = document.getElementById('main-camera').object3D;
 
-    // 중앙 조준선(ray) 기준 실제 화면 정중앙 방향으로 대상 고정
-    const forward = new THREE.Vector3(0, 0, -1);
+    const forward = new THREE.Vector3();
     cam.getWorldDirection(forward);
 
-    // 사용자가 조준한 실제 사물 방향 기준 3m 전방 지점에 고정
-    // (기존 quaternion 단순 적용보다 훨씬 정확)
-    const targetDistance = 0.5; // 흰원 기준 50cm 전방에 타겟 고정
+    const targetDistance = 0.5;
+    currentDistance = targetDistance;
     fixedSourcePos.copy(cam.position).add(
         forward.normalize().multiplyScalar(targetDistance)
     );
@@ -265,7 +255,7 @@ function updateSimulation() {
         lastFrameTime = now;
 
         const cam = document.getElementById('main-camera').object3D;
-        const distance = cam.position.distanceTo(fixedSourcePos);
+        const distance = currentDistance;
 
         const safeDistance = Math.max(distance, 0.15);
         const referenceDistance = 0.5;
