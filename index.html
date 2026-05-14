@@ -1,4 +1,4 @@
-# Radiation AR - WebXR/DeviceMotion Improved Version
+# Radiation AR - Target Selection + Distance + Cumulative Exposure
 
 ```html
 <!DOCTYPE html>
@@ -6,7 +6,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Radiation AR - Improved Motion Tracking</title>
+    <title>Radiation AR - Dose Tracker</title>
 
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
@@ -15,80 +15,80 @@
         body {
             margin: 0;
             overflow: hidden;
-            background: #000;
             font-family: sans-serif;
+            background: black;
         }
-
-        #ui-header {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 85%;
-            background: rgba(0,0,0,0.82);
-            border: 1px solid #00f2ff;
-            padding: 15px;
-            border-radius: 15px;
-            color: white;
-            text-align: center;
-            z-index: 1000;
-        }
-
-        .dose-val {
-            font-size: 32px;
-            color: #00ff00;
-            font-weight: bold;
-        }
-
-        #control-panel {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 85%;
-            background: rgba(20,20,20,0.9);
-            padding: 15px;
-            border-radius: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            z-index: 1001;
-        }
-
-        input {
-            background: #333;
-            color: white;
-            border: 1px solid #555;
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-            font-size: 16px;
-        }
-
-        button {
-            padding: 14px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            border: none;
-            font-size: 14px;
-        }
-
-        #btn-cam { background: #007bff; color: white; }
-        #btn-start { background: #28a745; color: white; }
 
         #crosshair {
             position: fixed;
             top: 50%;
             left: 50%;
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             border: 2px solid white;
             border-radius: 50%;
             transform: translate(-50%, -50%);
-            z-index: 999;
+            z-index: 1000;
             pointer-events: none;
         }
+
+        #ui-header {
+            position: fixed;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 88%;
+            background: rgba(0,0,0,0.82);
+            border: 1px solid #00f2ff;
+            border-radius: 14px;
+            padding: 14px;
+            color: white;
+            text-align: center;
+            z-index: 1001;
+        }
+
+        .main-dose {
+            font-size: 30px;
+            font-weight: bold;
+            color: #00ff00;
+        }
+
+        #control-panel {
+            position: fixed;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 88%;
+            background: rgba(20,20,20,0.92);
+            border-radius: 14px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1002;
+        }
+
+        input, button {
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            font-size: 15px;
+        }
+
+        input {
+            background: #333;
+            color: white;
+            text-align: center;
+            border: 1px solid #555;
+        }
+
+        button {
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #btn-init { background: #007bff; color: white; }
+        #btn-lock { background: #28a745; color: white; }
 
         #log {
             position: fixed;
@@ -97,32 +97,33 @@
             width: 100%;
             max-height: 120px;
             overflow-y: auto;
-            background: rgba(255,0,0,0.75);
+            background: rgba(255,0,0,0.7);
             color: white;
-            font-size: 11px;
-            z-index: 2000;
+            font-size: 10px;
             display: none;
-            white-space: pre-wrap;
+            z-index: 3000;
         }
     </style>
 </head>
 <body>
 
-<div id="log"></div>
 <div id="crosshair"></div>
+<div id="log"></div>
 
 <div id="ui-header">
-    <div id="status">먼저 [카메라/센서 시작] 버튼을 누르세요</div>
-    <div class="dose-val">
-        <span id="dose-display">0.00</span> <small>mSv/hr</small>
-    </div>
-    <div id="dist-display" style="font-size:14px; color:#ccc;">거리: 0.00 m</div>
+    <div id="status">[센서 시작] 후 중앙 원으로 대상 조준</div>
+    <div>현재 선량률</div>
+    <div class="main-dose"><span id="dose-rate">0.00</span> mSv/hr</div>
+    <div id="distance">거리: 0.00 m</div>
+    <div id="target-dose">기준 선량: 0.00 mSv/hr</div>
+    <div id="cumulative-dose">누적 피폭량: 0.000 mSv</div>
+    <div id="elapsed-time">경과 시간: 0 초</div>
 </div>
 
 <div id="control-panel">
-    <input type="number" id="dose-input" value="10" placeholder="기준 선량 (0.5m 기준)">
-    <button id="btn-cam" onclick="initSensors()">1. 카메라/센서 시작</button>
-    <button id="btn-start" onclick="startMeasurement()">2. 측정 시작 (사물 조준)</button>
+    <input type="number" id="base-dose-input" value="10" min="0" step="0.1" placeholder="대상 지점 선량률 (mSv/hr)">
+    <button id="btn-init" onclick="initSensors()">1. 센서 시작</button>
+    <button id="btn-lock" onclick="lockTarget()">2. 중앙 원으로 대상 선택</button>
     <button onclick="location.reload()" style="background:#444; color:white;">초기화</button>
 </div>
 
@@ -130,60 +131,58 @@
     embedded
     vr-mode-ui="enabled: false"
     renderer="alpha: true; antialias: true"
-    arjs="sourceType: webcam; debugUIEnabled: false;"
->
+    arjs="sourceType: webcam; debugUIEnabled: false;">
+
     <a-entity id="rig" position="0 1.6 0">
-        <a-camera id="main-camera" gps-camera rotation-reader></a-camera>
+        <a-camera id="main-camera"></a-camera>
     </a-entity>
 
-    <a-sphere id="target-marker"
-        radius="0.08"
-        color="#ff0000"
-        visible="false">
-    </a-sphere>
+    <a-sphere id="target-marker" radius="0.08" color="#ff0000" visible="false"></a-sphere>
+
+    <a-entity id="dose-label" visible="false"
+        text="value: ; color: yellow; align: center; width: 4">
+    </a-entity>
+
 </a-scene>
 
 <script>
-let baseDose = 10;
-let isMeasuring = false;
 let fixedSourcePos = new THREE.Vector3();
 let estimatedUserPos = new THREE.Vector3(0, 1.6, 0);
 let velocity = new THREE.Vector3(0, 0, 0);
-let lastMotionTime = null;
 let motionActive = false;
+let lastMotionTime = null;
+
+let baseDoseRate = 0;
+let targetLocked = false;
+let cumulativeDose = 0;
+let measurementStartTime = null;
+let lastFrameTime = null;
 
 function debugLog(msg) {
-    const logDiv = document.getElementById('log');
-    logDiv.style.display = 'block';
-    logDiv.innerText += msg + "\n";
+    const log = document.getElementById('log');
+    log.style.display = 'block';
+    log.innerText += msg + "\n";
 }
 
 async function initSensors() {
     try {
-        // iOS motion permission
-        if (
-            typeof DeviceMotionEvent !== 'undefined' &&
-            typeof DeviceMotionEvent.requestPermission === 'function'
-        ) {
-            const motionPerm = await DeviceMotionEvent.requestPermission();
-            if (motionPerm !== 'granted') {
-                alert('모션 센서 권한이 필요합니다.');
+        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+            const permission = await DeviceMotionEvent.requestPermission();
+            if (permission !== 'granted') {
+                alert('모션 센서 권한 필요');
                 return;
             }
         }
 
-        if (
-            typeof DeviceOrientationEvent !== 'undefined' &&
-            typeof DeviceOrientationEvent.requestPermission === 'function'
-        ) {
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
             await DeviceOrientationEvent.requestPermission();
         }
 
         window.addEventListener('devicemotion', handleMotion, true);
         motionActive = true;
 
-        document.getElementById('status').innerText = '센서 활성화 완료. 사물을 조준하세요.';
-        document.getElementById('btn-cam').style.display = 'none';
+        document.getElementById('status').innerText = '센서 활성화 완료. 중앙 원으로 목표 조준';
+        document.getElementById('btn-init').style.display = 'none';
     } catch (err) {
         debugLog(err.message);
         alert('센서 초기화 실패');
@@ -207,9 +206,8 @@ function handleMotion(event) {
 
     if (dt > 0.2) return;
 
-    const cameraObj = document.getElementById('main-camera').object3D;
+    const cam = document.getElementById('main-camera').object3D;
 
-    // 중력/노이즈 완화용 threshold
     const threshold = 0.15;
 
     let localAcc = new THREE.Vector3(
@@ -218,71 +216,82 @@ function handleMotion(event) {
         Math.abs(acc.z) < threshold ? 0 : acc.z
     );
 
-    // 기기 방향 기준 -> 월드 좌표 변환
-    localAcc.applyQuaternion(cameraObj.quaternion);
+    localAcc.applyQuaternion(cam.quaternion);
 
-    // 속도 적분
     velocity.add(localAcc.multiplyScalar(dt));
-
-    // 감쇠 (드리프트 완화)
     velocity.multiplyScalar(0.92);
 
-    // 위치 적분
     estimatedUserPos.add(velocity.clone().multiplyScalar(dt));
 
-    cameraObj.position.copy(estimatedUserPos);
+    cam.position.copy(estimatedUserPos);
 }
 
-function startMeasurement() {
-    baseDose = parseFloat(document.getElementById('dose-input').value) || 10;
+function lockTarget() {
+    baseDoseRate = parseFloat(document.getElementById('base-dose-input').value) || 0;
 
-    const cameraObj = document.getElementById('main-camera').object3D;
+    const cam = document.getElementById('main-camera').object3D;
 
-    // 현재 조준 방향 기준 2m 전방 고정
     const forward = new THREE.Vector3(0, 0, -2.0);
-    forward.applyQuaternion(cameraObj.quaternion);
+    forward.applyQuaternion(cam.quaternion);
 
-    fixedSourcePos.copy(cameraObj.position).add(forward);
+    fixedSourcePos.copy(cam.position).add(forward);
 
     const marker = document.getElementById('target-marker');
     marker.object3D.position.copy(fixedSourcePos);
     marker.setAttribute('visible', true);
 
-    isMeasuring = true;
+    const label = document.getElementById('dose-label');
+    label.object3D.position.copy(fixedSourcePos.clone().add(new THREE.Vector3(0, 0.25, 0)));
+    label.setAttribute('text', `value: ${baseDoseRate.toFixed(2)} mSv/hr; color: yellow; align: center; width: 4`);
+    label.setAttribute('visible', true);
 
-    document.getElementById('status').innerText = '측정 중: 실제로 앞뒤/좌우 이동하세요';
-    document.getElementById('status').style.color = '#00f2ff';
+    document.getElementById('target-dose').innerText = `기준 선량: ${baseDoseRate.toFixed(2)} mSv/hr`;
+
+    cumulativeDose = 0;
+    measurementStartTime = performance.now();
+    lastFrameTime = performance.now();
+    targetLocked = true;
+
+    document.getElementById('status').innerText = '측정 중: 이동하며 실시간 피폭량 추적';
 }
 
-function updateDose() {
-    if (isMeasuring) {
+function updateSimulation() {
+    if (targetLocked) {
+        const now = performance.now();
+        const deltaTimeHours = (now - lastFrameTime) / 3600000;
+        lastFrameTime = now;
+
         const camPos = document.getElementById('main-camera').object3D.position;
 
-        const dist = camPos.distanceTo(fixedSourcePos);
-
+        const distance = camPos.distanceTo(fixedSourcePos);
+        const safeDistance = Math.max(distance, 0.15);
         const referenceDistance = 0.5;
-        const safeDist = Math.max(dist, 0.15);
 
-        const dose = baseDose * Math.pow(referenceDistance / safeDist, 2);
+        const currentDoseRate = baseDoseRate * Math.pow(referenceDistance / safeDistance, 2);
 
-        const doseEl = document.getElementById('dose-display');
-        doseEl.innerText = dose.toFixed(2);
+        cumulativeDose += currentDoseRate * deltaTimeHours;
 
-        document.getElementById('dist-display').innerText = `거리: ${dist.toFixed(2)} m`;
+        document.getElementById('dose-rate').innerText = currentDoseRate.toFixed(2);
+        document.getElementById('distance').innerText = `거리: ${distance.toFixed(2)} m`;
+        document.getElementById('cumulative-dose').innerText = `누적 피폭량: ${cumulativeDose.toFixed(4)} mSv`;
 
-        if (dose > 15) {
+        const elapsedSec = Math.floor((now - measurementStartTime) / 1000);
+        document.getElementById('elapsed-time').innerText = `경과 시간: ${elapsedSec} 초`;
+
+        const doseEl = document.getElementById('dose-rate');
+        if (currentDoseRate > 15) {
             doseEl.style.color = '#ff3c3c';
-        } else if (dose > 5) {
+        } else if (currentDoseRate > 5) {
             doseEl.style.color = '#ffaa00';
         } else {
             doseEl.style.color = '#00ff00';
         }
     }
 
-    requestAnimationFrame(updateDose);
+    requestAnimationFrame(updateSimulation);
 }
 
-updateDose();
+updateSimulation();
 </script>
 
 </body>
