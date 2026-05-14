@@ -183,48 +183,46 @@ function handleMotion(event) {
 
     if (dt <= 0 || dt > 0.1) return;
 
-    // 스마트폰의 실제 전후 이동을 카메라 바라보는 방향 기준으로 계산
+    // 3축(XYZ) 전체 이동 추적 기반 실제 공간 거리 계산
     const cam = document.getElementById('main-camera').object3D;
 
-    // gravity 제거 선형가속도 벡터
     let accVector = new THREE.Vector3(
         acc.x || 0,
         acc.y || 0,
         acc.z || 0
     );
 
-    // 작은 노이즈 제거
-    if (accVector.length() < 0.06) {
-        forwardVelocity = 0;
+    // 미세 노이즈 제거
+    if (accVector.length() < 0.05) {
+        velocity.set(0, 0, 0);
         return;
     }
 
-    // 기기 좌표계를 월드 좌표계로 변환
+    // 기기 좌표 -> 월드 좌표 변환
     accVector.applyQuaternion(cam.quaternion);
 
-    // 카메라가 바라보는 정면 방향 벡터
-    const forward = new THREE.Vector3();
-    cam.getWorldDirection(forward);
-    forward.normalize();
-
-    // 전후 방향 성분만 추출 (dot product)
-    const forwardAcc = accVector.dot(forward);
-
     // 속도 적분
-    forwardVelocity += forwardAcc * dt;
+    velocity.add(accVector.multiplyScalar(dt));
 
-    // 감쇠
-    forwardVelocity *= 0.72;
+    // 드리프트 억제 감쇠
+    velocity.multiplyScalar(0.78);
 
     // 미세 속도 제거
-    if (Math.abs(forwardVelocity) < 0.002) {
-        forwardVelocity = 0;
+    if (velocity.length() < 0.003) {
+        velocity.set(0, 0, 0);
         return;
     }
 
-    // 거리 변화
-    // 앞으로 이동하면 거리 감소, 뒤로 이동하면 증가
-    currentDistance -= forwardVelocity * dt;
+    // 실제 위치 업데이트 (앞뒤/좌우/상하 모두 반영)
+    estimatedUserPos.add(
+        velocity.clone().multiplyScalar(dt)
+    );
+
+    // 카메라 위치 갱신
+    cam.position.copy(estimatedUserPos);
+
+    // 현재 타겟과 사용자 간 실제 3D 거리 계산
+    currentDistance = estimatedUserPos.distanceTo(fixedSourcePos);
 
     // 거리 제한: 최소 0.5m, 최대 10m
     currentDistance = Math.max(0.5, Math.min(currentDistance, 10));
