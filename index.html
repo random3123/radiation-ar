@@ -178,35 +178,41 @@ function handleMotion(event) {
     const dt = (now - lastMotionTime) / 1000;
     lastMotionTime = now;
 
-    if (dt > 0.15) return;
+    if (dt > 0.1) return;
 
     const cam = document.getElementById('main-camera').object3D;
 
-    let localAcc = new THREE.Vector3(
+    // 작은 손떨림 제거
+    const filteredAcc = new THREE.Vector3(
         Math.abs(acc.x) < MOTION_THRESHOLD ? 0 : acc.x,
         Math.abs(acc.y) < MOTION_THRESHOLD ? 0 : acc.y,
         Math.abs(acc.z) < MOTION_THRESHOLD ? 0 : acc.z
     );
 
-    // 움직임 거의 없으면 속도 제거
-    if (localAcc.length() === 0) {
-        velocity.multiplyScalar(0.5);
-        if (velocity.length() < STOP_THRESHOLD) {
-            velocity.set(0, 0, 0);
-        }
+    // 움직임이 거의 없으면 완전 정지 처리
+    if (filteredAcc.lengthSq() === 0) {
+        velocity.set(0, 0, 0);
         return;
     }
 
-    localAcc.applyQuaternion(cam.quaternion);
+    // 카메라 방향 기준 실제 이동 방향 반영
+    filteredAcc.applyQuaternion(cam.quaternion);
 
-    velocity.add(localAcc.multiplyScalar(dt));
-    velocity.multiplyScalar(VELOCITY_DAMPING);
+    // 속도 계산
+    velocity.add(filteredAcc.multiplyScalar(dt));
 
+    // 강한 감쇠 적용
+    velocity.multiplyScalar(0.65);
+
+    // 매우 작은 속도 제거
     if (velocity.length() < STOP_THRESHOLD) {
         velocity.set(0, 0, 0);
+        return;
     }
 
-    estimatedUserPos.add(velocity.clone().multiplyScalar(dt));
+    // 위치 업데이트
+    const movement = velocity.clone().multiplyScalar(dt);
+    estimatedUserPos.add(movement);
 
     cam.position.copy(estimatedUserPos);
 }
@@ -216,10 +222,16 @@ function lockTarget() {
 
     const cam = document.getElementById('main-camera').object3D;
 
-    const forward = new THREE.Vector3(0, 0, -2.0);
-    forward.applyQuaternion(cam.quaternion);
+    // 중앙 조준선(ray) 기준 실제 화면 정중앙 방향으로 대상 고정
+    const forward = new THREE.Vector3(0, 0, -1);
+    cam.getWorldDirection(forward);
 
-    fixedSourcePos.copy(cam.position).add(forward);
+    // 사용자가 조준한 실제 사물 방향 기준 3m 전방 지점에 고정
+    // (기존 quaternion 단순 적용보다 훨씬 정확)
+    const targetDistance = 3.0;
+    fixedSourcePos.copy(cam.position).add(
+        forward.normalize().multiplyScalar(targetDistance)
+    );
 
     const marker = document.getElementById('target-marker');
     marker.object3D.position.copy(fixedSourcePos);
