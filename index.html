@@ -115,7 +115,7 @@
         <a-camera id="main-camera"></a-camera>
     </a-entity>
 
-    <a-sphere id="target-marker" radius="0.18" color="red" visible="false"></a-sphere>
+    <a-sphere id="target-marker" radius="0.3" color="red" visible="false" material="shader: standard; emissive: red; emissiveIntensity: 2;"></a-sphere>
 
     <a-entity id="dose-label" visible="false"
         text="value: ; color: white; align: center; width: 6; side: double;">
@@ -221,8 +221,13 @@ function handleMotion(event) {
     // 카메라 위치 갱신
     cam.position.copy(estimatedUserPos);
 
-    // 현재 타겟과 사용자 간 실제 3D 거리 계산
-    currentDistance = estimatedUserPos.distanceTo(fixedSourcePos);
+    // 중요: 타겟(fixedSourcePos)은 lockTarget() 시점에 고정되고 절대 이동하지 않음
+    // 카메라(estimatedUserPos)만 이동
+
+    cam.position.copy(estimatedUserPos);
+
+    // 고정된 타겟과 현재 카메라 위치 사이 실제 거리 계산
+    currentDistance = cam.position.distanceTo(fixedSourcePos);
 
     // 거리 제한: 최소 0.5m, 최대 10m
     currentDistance = Math.max(0.5, Math.min(currentDistance, 10));
@@ -244,15 +249,22 @@ function lockTarget() {
 
     const marker = document.getElementById('target-marker');
     marker.object3D.position.copy(fixedSourcePos);
+    marker.object3D.scale.set(1,1,1);
     marker.setAttribute('visible', true);
 
+    // 디버깅용: 항상 타겟 위치 확인 가능
+    console.log('Target locked at:', fixedSourcePos.x, fixedSourcePos.y, fixedSourcePos.z);
+
     const label = document.getElementById('dose-label');
-    label.object3D.position.copy(fixedSourcePos);
+    label.object3D.position.copy(
+        fixedSourcePos.clone().add(new THREE.Vector3(0, 0.45, 0))
+    );
     label.setAttribute(
         'text',
         `value: ${baseDoseRate.toFixed(1)} mSv/hr; color: white; align: center; width: 6; side: double;`
     );
     label.object3D.lookAt(cam.position);
+        marker.object3D.lookAt(cam.position);
     label.setAttribute('visible', true);
 
     cumulativeDose = 0;
@@ -289,6 +301,7 @@ function updateSimulation() {
 
         const label = document.getElementById('dose-label');
         label.object3D.lookAt(cam.position);
+        marker.object3D.lookAt(cam.position);
 
         const doseEl = document.getElementById('dose-rate');
         if (currentDoseRate > 15) {
