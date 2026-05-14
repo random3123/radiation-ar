@@ -3,119 +3,103 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>방사선 안전 AR (공간 인식형)</title>
+    <title>방사선 선량 시뮬레이터</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
     <style>
-        #ui-container {
-            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-            width: 85%; background: rgba(0,0,0,0.85); color: white;
-            padding: 15px; border-radius: 12px; text-align: center;
-            font-family: sans-serif; z-index: 1000; border: 2px solid #00c8ff;
-            pointer-events: none;
+        #ui-layer { position: fixed; top: 10px; width: 100%; text-align: center; color: white; font-family: sans-serif; pointer-events: none; }
+        #control-panel { 
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); 
+            background: rgba(0,0,0,0.8); padding: 15px; border-radius: 15px; 
+            color: white; text-align: center; z-index: 1000;
         }
-        .instruction { font-size: 13px; color: #00c8ff; margin-bottom: 5px; }
-        .value { font-size: 28px; font-weight: bold; color: #00ff00; }
-        #setting-panel {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: rgba(255,255,255,0.9); padding: 10px; border-radius: 10px;
-            z-index: 1001; display: flex; gap: 10px; align-items: center;
-        }
-        button { padding: 10px; border-radius: 5px; border: none; background: #007bff; color: white; cursor: pointer; }
+        button { padding: 10px 20px; font-size: 16px; margin-top: 10px; cursor: pointer; }
     </style>
 </head>
-
 <body style="margin: 0; overflow: hidden;">
 
-    <div id="ui-container">
-        <div class="instruction">배관 지점을 터치하여 선원을 배치하세요</div>
-        <div id="dist-display" style="font-size:14px; color:#ccc;">거리: - m</div>
-        <div id="dose-rate" class="value">0.00 mSv/hr</div>
+    <div id="ui-layer">
+        <div id="status-msg" style="background: rgba(0,0,0,0.5); padding: 5px;">지점을 터치하여 선원을 배치하세요</div>
+        <div style="font-size: 24px; margin-top: 10px;">선량: <span id="dose-val">0.00</span> mSv/hr</div>
+        <div id="dist-val">거리: - m</div>
     </div>
 
-    <div id="setting-panel">
-        <label style="font-size: 12px;">선량 설정:</label>
-        <select id="dose-setting">
-            <option value="10">10 mSv/hr</option>
-            <option value="5">5 mSv/hr</option>
-            <option value="1">1 mSv/hr</option>
-        </select>
-        <button onclick="resetSource()">다시 배치</button>
+    <div id="control-panel">
+        <div>선원 세기(mSv/hr): <input type="number" id="dose-input" value="10" style="width: 60px;"></div>
+        <button id="apply-btn" onclick="applySettings()">적용하기</button>
+        <button onclick="resetApp()">초기화</button>
     </div>
 
-    <a-scene 
-        embedded 
-        arjs="sourceType: webcam; debugUIEnabled: false;"
-        vr-mode-ui="enabled: false"
-        raycaster="objects: .clickable"
-        cursor="rayOrigin: mouse">
-        
-        <a-entity id="radiation-source" visible="false">
-            <a-sphere radius="0.1" color="yellow" opacity="0.7" animation="property: scale; to: 1.2 1.2 1.2; dir: alternate; dur: 1000; loop: true"></a-sphere>
-            <a-ring color="red" rotation="-90 0 0" radius-inner="0.15" radius-outer="0.2"></a-ring>
+    <a-scene embedded vr-mode-ui="enabled: false">
+        <a-entity id="source" visible="false">
+            <a-sphere radius="0.15" color="yellow"></a-sphere>
         </a-entity>
-
-        <a-sky id="touch-canvas" class="clickable" opacity="0" radius="10"></a-sky>
-        <a-entity camera position="0 1.6 0"></a-entity>
+        <a-entity camera position="0 1.6 0" look-controls></a-entity>
+        <a-sky id="touch-area" color="#ECECEC" opacity="0"></a-sky>
     </a-scene>
 
     <script>
-        let sourceActive = false;
-        let baseDose = 10;
-        const sourceEntity = document.getElementById('radiation-source');
-        const doseDisplay = document.getElementById('dose-rate');
-        const distDisplay = document.getElementById('dist-display');
-        const doseSelect = document.getElementById('dose-setting');
+        const source = document.getElementById('source');
+        const statusMsg = document.getElementById('status-msg');
+        const doseVal = document.getElementById('dose-val');
+        const distVal = document.getElementById('dist-val');
+        const doseInput = document.getElementById('dose-input');
+        
+        let targetPosition = null;
+        let baseDose = 0;
+        let isApplied = false;
 
-        // 화면 클릭 시 해당 위치에 선원 고정
-        document.querySelector('a-scene').addEventListener('click', function (evt) {
-            if (sourceActive) return; // 이미 배치했다면 패스
-
-            // 클릭한 지점의 월드 좌표 가져오기 (카메라 앞 2m 지점에 우선 생성)
-            const camera = document.querySelector('[camera]').object3D;
-            const direction = new THREE.Vector3(0, 0, -1);
-            direction.applyQuaternion(camera.quaternion);
+        // 1. 지점 터치 (배치)
+        document.getElementById('touch-area').addEventListener('click', function() {
+            if(isApplied) return;
             
-            const newPos = new THREE.Vector3();
-            newPos.copy(camera.position).addScaledVector(direction, 2); // 현재 카메라 앞 2m에 배치
-
-            sourceEntity.setAttribute('position', `${newPos.x} ${newPos.y} ${newPos.z}`);
-            sourceEntity.setAttribute('visible', 'true');
+            // 카메라 앞 2m 지점에 배치
+            const cam = document.querySelector('a-entity[camera]').object3D;
+            const pos = new THREE.Vector3(0, 0, -2).applyQuaternion(cam.quaternion).add(cam.position);
             
-            baseDose = parseFloat(doseSelect.value);
-            sourceActive = true;
-            document.querySelector('.instruction').innerText = "선원 배치 완료!";
-            document.querySelector('.instruction').style.color = "#00ff00";
+            source.setAttribute('position', pos);
+            source.setAttribute('visible', 'true');
+            targetPosition = pos;
+            statusMsg.innerText = "지점 선택 완료! 값을 설정 후 '적용하기'를 누르세요.";
         });
 
-        function resetSource() {
-            sourceActive = false;
-            sourceEntity.setAttribute('visible', 'false');
-            document.querySelector('.instruction').innerText = "배관 지점을 터치하여 선원을 배치하세요";
-            document.querySelector('.instruction').style.color = "#00c8ff";
-        }
-
-        // 매 프레임 거리 계산
-        function render() {
-            if (sourceActive) {
-                const camera = document.querySelector('[camera]').object3D;
-                const sourcePos = sourceEntity.object3D.position;
-                
-                // 3차원 거리 계산
-                const d = camera.position.distanceTo(sourcePos);
-                
-                // 역자승 법칙 (기준거리 0.5m 설정)
-                let currentDose = baseDose * Math.pow((0.5 / d), 2);
-                
-                distDisplay.innerText = `거리: ${d.toFixed(2)} m`;
-                doseDisplay.innerText = `${currentDose.toFixed(2)} mSv/hr`;
-
-                // 위험 선량 시 색상 변경
-                doseDisplay.style.color = currentDose >= 5 ? "#ff3333" : "#00ff00";
+        // 2. 적용하기 버튼
+        function applySettings() {
+            if(!targetPosition) {
+                alert("먼저 화면을 터치해 지점을 배치해주세요!");
+                return;
             }
-            requestAnimationFrame(render);
+            baseDose = parseFloat(doseInput.value);
+            isApplied = true;
+            statusMsg.innerText = "적용 완료! 거리에 따라 선량이 변합니다.";
+            statusMsg.style.background = "rgba(0, 200, 0, 0.7)";
         }
-        render();
+
+        function resetApp() {
+            source.setAttribute('visible', 'false');
+            isApplied = false;
+            targetPosition = null;
+            doseVal.innerText = "0.00";
+            distVal.innerText = "거리: - m";
+            statusMsg.innerText = "지점을 터치하여 선원을 배치하세요";
+            statusMsg.style.background = "rgba(0,0,0,0.5)";
+        }
+
+        // 3. 거리 계산 루프
+        function update() {
+            if (isApplied && targetPosition) {
+                const cam = document.querySelector('a-entity[camera]').object3D;
+                const dist = cam.position.distanceTo(targetPosition);
+                
+                // 역자승 법칙: I = I0 * (d0/d)^2 (기준거리 d0=0.5m)
+                const d0 = 0.5;
+                const dose = (dist < 0.2) ? baseDose : baseDose * Math.pow((d0 / dist), 2);
+                
+                doseVal.innerText = dose.toFixed(2);
+                distVal.innerText = "거리: " + dist.toFixed(2) + " m";
+            }
+            requestAnimationFrame(update);
+        }
+        update();
     </script>
 </body>
 </html>
