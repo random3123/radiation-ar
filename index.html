@@ -5,261 +5,234 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>AR 거리 측정기</title>
+    <!-- Three.js 라이브러리 로드 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: #000;
         }
 
-        #info-overlay {
+        /* 정보 표시 레이어 */
+        #ui-layer {
             position: absolute;
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            width: 90%;
-            z-index: 10;
-            text-align: center;
+            width: 85%;
+            z-index: 100;
+            pointer-events: none;
         }
 
-        .glass-panel {
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 15px;
+        .glass-card {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            border-radius: 20px;
+            padding: 20px;
             color: white;
             border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
 
         #status {
-            font-size: 14px;
-            margin-bottom: 5px;
-            color: #ccc;
+            font-size: 13px;
+            color: #aaa;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
         }
 
-        #distance-display {
-            font-size: 28px;
-            font-weight: bold;
-            color: #4CAF50;
+        #distance {
+            font-size: 32px;
+            font-weight: 800;
+            color: #00e676;
         }
 
+        /* 하단 컨트롤 */
         #controls {
             position: absolute;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 10;
+            bottom: 50px;
+            left: 0;
+            right: 0;
             display: flex;
-            gap: 20px;
+            justify-content: center;
+            gap: 15px;
+            z-index: 100;
         }
 
         .btn {
-            padding: 15px 25px;
-            border-radius: 30px;
+            padding: 16px 32px;
+            border-radius: 50px;
             border: none;
-            font-weight: bold;
+            font-weight: 700;
             font-size: 16px;
             cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            transition: transform 0.1s;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
         }
 
-        .btn:active {
-            transform: scale(0.95);
-        }
+        .btn:active { transform: scale(0.92); }
 
-        .btn-primary {
-            background: #4CAF50;
-            color: white;
-        }
+        #ar-start-btn { background: #00e676; color: #000; }
+        #reset-btn { background: #ff5252; color: #white; display: none; }
 
-        .btn-secondary {
-            background: #f44336;
-            color: white;
-        }
-
-        #unsupported-message {
+        /* 경고 메시지 */
+        #error-msg {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #222;
+            inset: 0;
+            background: #121212;
             color: white;
             padding: 40px;
+            z-index: 999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             text-align: center;
-            z-index: 100;
-            box-sizing: border-box;
         }
     </style>
 </head>
 <body>
 
-    <div id="info-overlay" class="glass-panel">
-        <div id="status">AR 시스템 초기화 중...</div>
-        <div id="distance-display">0.00 m</div>
+    <div id="ui-layer">
+        <div class="glass-card">
+            <div id="status">AR 측정 준비 중...</div>
+            <div id="distance">0.00 m</div>
+        </div>
     </div>
 
     <div id="controls">
-        <button id="reset-btn" class="btn btn-secondary">다시 측정</button>
-        <button id="ar-button" class="btn btn-primary">AR 시작하기</button>
+        <button id="ar-start-btn" class="btn">카메라 켜기 (AR 시작)</button>
+        <button id="reset-btn" class="btn">다시 측정</button>
     </div>
 
-    <div id="unsupported-message">
-        <h2>AR을 지원하지 않는 브라우저입니다.</h2>
-        <p>안드로이드의 Chrome 브라우저 최신 버전을 사용해 주세요.</p>
-        <p>또한 'Google Play 서비스용 AR'이 설치되어 있어야 합니다.</p>
+    <div id="error-msg">
+        <h2 style="color: #ff5252;">카메라를 실행할 수 없습니다</h2>
+        <p id="error-detail">브라우저가 WebXR을 지원하지 않거나 HTTPS 환경이 아닙니다.</p>
+        <button onclick="location.reload()" style="margin-top:20px; padding:10px 20px;">새로고침</button>
     </div>
 
     <script type="module">
-        let container;
-        let camera, scene, renderer;
-        let controller;
-        let reticle;
-        let hitTestSource = null;
-        let hitTestSourceRequested = false;
-        
-        let points = [];
-        let line = null;
-        let measureLabel = document.getElementById('distance-display');
-        let statusLabel = document.getElementById('status');
-        const arButton = document.getElementById('ar-button');
-        const resetBtn = document.getElementById('reset-btn');
+        let camera, scene, renderer, controller;
+        let reticle, hitTestSource = null, hitTestSourceRequested = false;
+        let points = [], line = null;
 
-        // Check WebXR support
-        if ('xr' in navigator) {
-            navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-                if (supported) {
-                    arButton.addEventListener('click', onStartAR);
-                } else {
-                    document.getElementById('unsupported-message').style.display = 'block';
-                    arButton.style.display = 'none';
+        const statusEl = document.getElementById('status');
+        const distanceEl = document.getElementById('distance');
+        const startBtn = document.getElementById('ar-start-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const errorMsg = document.getElementById('error-msg');
+
+        // 1. 브라우저 지원 확인
+        async function checkSupport() {
+            if ('xr' in navigator) {
+                const isSupported = await navigator.xr.isSessionSupported('immersive-ar');
+                if (!isSupported) {
+                    showError("이 기기는 AR 기능을 지원하지 않습니다.");
                 }
-            });
-        } else {
-            document.getElementById('unsupported-message').style.display = 'block';
-            arButton.style.display = 'none';
+            } else {
+                showError("WebXR을 지원하지 않는 브라우저입니다. 최신 크롬(Chrome) 앱을 사용하세요.");
+            }
         }
 
-        function init() {
-            container = document.createElement('div');
-            document.body.appendChild(container);
+        function showError(msg) {
+            errorMsg.style.display = 'flex';
+            document.getElementById('error-detail').innerText = msg;
+        }
 
+        // 2. 초기화
+        function initScene() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
             const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-            light.position.set(0.5, 1, 0.25);
             scene.add(light);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true;
-            container.appendChild(renderer.domElement);
+            document.body.appendChild(renderer.domElement);
 
-            // Controller / Touch logic
+            // 컨트롤러 설정 (화면 터치 인식)
             controller = renderer.xr.getController(0);
             controller.addEventListener('select', onSelect);
             scene.add(controller);
 
-            // Reticle (Targeting Ring)
+            // 조준점 (바닥 인식 링)
             reticle = new THREE.Mesh(
                 new THREE.RingGeometry(0.04, 0.05, 32).rotateX(-Math.PI / 2),
-                new THREE.MeshBasicMaterial({ color: 0x4CAF50 })
+                new THREE.MeshBasicMaterial({ color: 0x00e676 })
             );
             reticle.matrixAutoUpdate = false;
             reticle.visible = false;
             scene.add(reticle);
 
-            resetBtn.addEventListener('click', resetMeasurement);
-
             window.addEventListener('resize', onWindowResize);
         }
 
-        function onStartAR() {
-            const sessionInit = { requiredFeatures: ['hit-test'] };
-            navigator.xr.requestSession('immersive-ar', sessionInit).then(onSessionStarted);
-            arButton.style.display = 'none';
-        }
+        // 3. AR 세션 시작 (여기서 카메라 권한 요청 발생)
+        async function startAR() {
+            try {
+                const session = await navigator.xr.requestSession('immersive-ar', {
+                    requiredFeatures: ['hit-test'],
+                    optionalFeatures: ['dom-overlay'],
+                    domOverlay: { root: document.body }
+                });
 
-        async function onSessionStarted(session) {
-            renderer.xr.setReferenceSpaceType('local');
-            await renderer.xr.setSession(session);
-            statusLabel.innerText = "바닥을 천천히 비춰주세요...";
-            init();
-            animate();
+                initScene();
+                renderer.xr.setReferenceSpaceType('local');
+                await renderer.xr.setSession(session);
+
+                startBtn.style.display = 'none';
+                resetBtn.style.display = 'block';
+                statusEl.innerText = "바닥을 천천히 비춰주세요";
+                
+                renderer.setAnimationLoop(render);
+            } catch (e) {
+                showError("카메라 세션 시작 실패: " + e.message);
+            }
         }
 
         function onSelect() {
             if (reticle.visible) {
-                // Add a measurement point at the reticle position
-                const point = new THREE.Vector3();
-                point.setFromMatrixPosition(reticle.matrix);
-                
-                // Add visual marker
-                const geometry = new THREE.SphereGeometry(0.02, 16, 16);
-                const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
-                const sphere = new THREE.Mesh(geometry, material);
-                sphere.position.copy(point);
+                const position = new THREE.Vector3();
+                position.setFromMatrixPosition(reticle.matrix);
+
+                // 지점 표시용 구체 생성
+                const sphere = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.02, 16, 16),
+                    new THREE.MeshBasicMaterial({ color: 0xffffff })
+                );
+                sphere.position.copy(position);
                 scene.add(sphere);
 
-                points.push(point);
+                points.push(position);
 
                 if (points.length >= 2) {
-                    updateLine();
-                    statusLabel.innerText = "측정 완료! (두 점 사이 거리)";
+                    updateMeasurement();
                 } else {
-                    statusLabel.innerText = "다음 지점을 선택해 주세요.";
+                    statusEl.innerText = "다음 지점을 찍어주세요";
                 }
             }
         }
 
-        function updateLine() {
-            if (points.length < 2) return;
-
+        function updateMeasurement() {
             if (line) scene.remove(line);
 
-            const material = new THREE.LineBasicMaterial({ color: 0x4CAF50, linewidth: 5 });
-            const geometry = new THREE.BufferGeometry().setFromPoints([points[points.length - 2], points[points.length - 1]]);
-            line = new THREE.Line(geometry, material);
+            const p1 = points[points.length - 2];
+            const p2 = points[points.length - 1];
+
+            const geometry = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+            line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0x00e676, linewidth: 3 }));
             scene.add(line);
 
-            const dist = points[points.length - 2].distanceTo(points[points.length - 1]);
-            measureLabel.innerText = dist.toFixed(2) + " m";
-        }
-
-        function resetMeasurement() {
-            points = [];
-            if (line) {
-                scene.remove(line);
-                line = null;
-            }
-            // Remove spheres
-            scene.children = scene.children.filter(child => {
-                if (child.type === "Mesh" && child !== reticle) {
-                    scene.remove(child);
-                    return false;
-                }
-                return true;
-            });
-            measureLabel.innerText = "0.00 m";
-            statusLabel.innerText = "바닥을 비춰 지점을 선택하세요.";
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        function animate() {
-            renderer.setAnimationLoop(render);
+            const dist = p1.distanceTo(p2);
+            distanceEl.innerText = dist.toFixed(2) + " m";
+            statusEl.innerText = "측정 완료";
         }
 
         function render(timestamp, frame) {
@@ -267,22 +240,18 @@
                 const referenceSpace = renderer.xr.getReferenceSpace();
                 const session = renderer.xr.getSession();
 
-                if (hitTestSourceRequested === false) {
-                    session.requestReferenceSpace('viewer').then((referenceSpace) => {
-                        session.requestHitTestSource({ space: referenceSpace }).then((source) => {
+                if (!hitTestSourceRequested) {
+                    session.requestReferenceSpace('viewer').then((refSpace) => {
+                        session.requestHitTestSource({ space: refSpace }).then((source) => {
                             hitTestSource = source;
                         });
-                    });
-                    session.addEventListener('end', () => {
-                        hitTestSourceRequested = false;
-                        hitTestSource = null;
                     });
                     hitTestSourceRequested = true;
                 }
 
                 if (hitTestSource) {
                     const hitTestResults = frame.getHitTestResults(hitTestSource);
-                    if (hitTestResults.length) {
+                    if (hitTestResults.length > 0) {
                         const hit = hitTestResults[0];
                         reticle.visible = true;
                         reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
@@ -293,6 +262,19 @@
             }
             renderer.render(scene, camera);
         }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        startBtn.addEventListener('click', startAR);
+        resetBtn.addEventListener('click', () => {
+            location.reload(); // 간단하게 초기화
+        });
+
+        checkSupport();
     </script>
 </body>
 </html>
