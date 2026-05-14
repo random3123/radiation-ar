@@ -9,31 +9,38 @@
     <style>
         #ui-container {
             position: fixed;
-            top: 10px;
+            top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            width: 90%;
-            max-width: 400px;
-            background: rgba(0, 0, 0, 0.8);
+            width: 85%;
+            background: rgba(0, 0, 0, 0.85);
             color: white;
             padding: 15px;
-            border-radius: 10px;
+            border-radius: 12px;
             text-align: center;
-            font-family: sans-serif;
+            font-family: 'Malgun Gothic', sans-serif;
             z-index: 1000;
             border: 2px solid #ffcc00;
-            pointer-events: none; /* 카메라 화면 터치 방해 금지 */
+            pointer-events: none;
         }
-        .label { font-size: 14px; color: #ccc; margin: 2px 0; }
-        .value { font-size: 28px; font-weight: bold; color: #00ff00; }
+        .label { font-size: 14px; color: #bbb; margin-bottom: 5px; }
+        .value { font-size: 26px; font-weight: bold; color: #00ff00; }
         .warning { color: #ff3333 !important; }
+        #status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: red;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
     </style>
 </head>
 
 <body style="margin: 0; overflow: hidden;">
 
     <div id="ui-container">
-        <div id="qr-id" class="label">마커를 비춰주세요</div>
+        <div class="label"><span id="status-dot"></span> <span id="source-name">마커를 찾는 중...</span></div>
         <div id="distance" class="label">거리: - m</div>
         <div id="dose-rate" class="value">0.00 mSv/hr</div>
     </div>
@@ -41,18 +48,24 @@
     <a-scene 
         embedded 
         vr-mode-ui="enabled: false"
-        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;">
+        arjs="sourceType: webcam; 
+              debugUIEnabled: false; 
+              detectionMode: mono_and_matrix; 
+              matrixCodeType: 3x3; 
+              labelingMode: black_region; 
+              canvasWidth: 640; 
+              canvasHeight: 480;">
         
-        <a-marker type="barcode" value="1" id="m1" data-i0="10" data-d0="0.5">
-            <a-box position="0 0.5 0" material="opacity: 0.5; color: red;" scale="0.2 0.2 0.2"></a-box>
+        <a-marker type="barcode" value="1" id="marker1">
+            <a-sphere position="0 0.5 0" radius="0.1" color="red" opacity="0.6"></a-sphere>
         </a-marker>
 
-        <a-marker type="barcode" value="2" id="m2" data-i0="5" data-d0="0.5">
-            <a-box position="0 0.5 0" material="opacity: 0.5; color: yellow;" scale="0.2 0.2 0.2"></a-box>
+        <a-marker type="barcode" value="2" id="marker2">
+            <a-sphere position="0 0.5 0" radius="0.1" color="yellow" opacity="0.6"></a-sphere>
         </a-marker>
 
-        <a-marker type="barcode" value="3" id="m3" data-i0="3" data-d0="0.5">
-            <a-box position="0 0.5 0" material="opacity: 0.5; color: green;" scale="0.2 0.2 0.2"></a-box>
+        <a-marker type="barcode" value="3" id="marker3">
+            <a-sphere position="0 0.5 0" radius="0.1" color="green" opacity="0.6"></a-sphere>
         </a-marker>
 
         <a-entity camera></a-entity>
@@ -61,51 +74,56 @@
     <script>
         const uiDose = document.getElementById('dose-rate');
         const uiDist = document.getElementById('distance');
-        const uiId = document.getElementById('qr-id');
-        
-        // 거리 역자승 법칙 계산 함수
-        function calculateDose(i0, d0, d) {
-            if (d < 0.2) d = 0.2; // 너무 가까울 때 인식 불안정 방지
-            return i0 * Math.pow((d0 / d), 2);
-        }
+        const uiName = document.getElementById('source-name');
+        const uiDot = document.getElementById('status-dot');
 
-        const markers = document.querySelectorAll('a-marker');
+        // 각 마커의 기준 데이터 설정
+        const markerData = {
+            "marker1": { i0: 10, d0: 0.5, name: "선원 #1 (고선량)" },
+            "marker2": { i0: 5, d0: 0.5, name: "선원 #2 (중선량)" },
+            "marker3": { i0: 3, d0: 0.5, name: "선원 #3 (저선량)" }
+        };
 
         setInterval(() => {
-            let anyVisible = false;
-
-            markers.forEach(marker => {
-                if (marker.object3D.visible) {
-                    anyVisible = true;
+            let found = false;
+            
+            for (let id in markerData) {
+                const marker = document.getElementById(id);
+                if (marker && marker.object3D.visible) {
+                    found = true;
                     
-                    // 카메라와 마커 사이의 좌표 거리 계산
+                    // 거리 계산
                     let pos = marker.object3D.position;
                     let d = Math.sqrt(pos.x**2 + pos.y**2 + pos.z**2);
                     
-                    // A4 사이즈(21cm) 마커 기준 거리 보정값 (실제 환경에 맞춰 미세조정 가능)
-                    let actualDistance = d * 0.25; 
+                    // 거리 보정 (A4 21cm 기준, 실측 거리가 다르면 0.25를 조정하세요)
+                    let actualDist = d * 0.25; 
+                    if (actualDist < 0.1) actualDist = 0.1;
 
-                    let i0 = parseFloat(marker.getAttribute('data-i0'));
-                    let d0 = parseFloat(marker.getAttribute('data-d0'));
-                    let currentDose = calculateDose(i0, d0, actualDistance);
+                    // 역자승 법칙 계산
+                    let data = markerData[id];
+                    let dose = data.i0 * Math.pow((data.d0 / actualDist), 2);
 
                     // UI 업데이트
-                    uiId.innerText = "인식됨: 선원 #" + marker.getAttribute('value');
-                    uiDist.innerText = "거리: " + actualDistance.toFixed(2) + " m";
-                    uiDose.innerText = currentDose.toFixed(2) + " mSv/hr";
+                    uiName.innerText = data.name;
+                    uiDist.innerText = "거리: " + actualDist.toFixed(2) + " m";
+                    uiDose.innerText = dose.toFixed(2) + " mSv/hr";
+                    uiDot.style.background = "#00ff00";
 
-                    // 선량률에 따른 색상 변경
-                    if (currentDose >= 5) {
-                        uiDose.className = "value warning";
+                    // 경고 색상
+                    if (dose >= 5) {
+                        uiDose.classList.add('warning');
                     } else {
-                        uiDose.className = "value";
+                        uiDose.classList.remove('warning');
                     }
+                    break; // 여러 개가 인식되어도 하나만 표시
                 }
-            });
+            }
 
-            if (!anyVisible) {
-                uiId.innerText = "마커를 찾는 중...";
+            if (!found) {
+                uiName.innerText = "마커를 찾는 중...";
                 uiDist.innerText = "거리: - m";
+                uiDot.style.background = "red";
             }
         }, 100);
     </script>
