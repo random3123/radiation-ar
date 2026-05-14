@@ -5,148 +5,75 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Radiation AR Pro</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style>
-        :root { --neon-blue: #00f2ff; --neon-red: #ff3c3c; --bg-dark: rgba(15, 20, 30, 0.95); }
-        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #000; }
-
-        /* 상단 선량계 UI */
-        #ui-header {
-            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-            width: 85%; max-width: 400px; background: var(--bg-dark);
-            border: 1px solid var(--neon-blue); border-radius: 15px;
-            padding: 15px; color: white; text-align: center; z-index: 1000;
-            box-shadow: 0 0 20px rgba(0, 242, 255, 0.2); pointer-events: none;
-        }
-        .status-text { font-size: 11px; letter-spacing: 1px; color: var(--neon-blue); margin-bottom: 5px; }
-        .dose-display { font-size: 38px; font-weight: 800; color: #00ff00; font-family: monospace; }
-        .unit { font-size: 16px; margin-left: 5px; color: #aaa; }
-        .distance-info { font-size: 14px; color: #fff; margin-top: 5px; background: rgba(255,255,255,0.1); display: inline-block; padding: 2px 10px; border-radius: 10px; }
-
-        /* 하단 컨트롤 패널 */
-        #control-panel {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            width: 85%; max-width: 380px; background: var(--bg-dark);
-            border-radius: 20px; padding: 15px; z-index: 1001;
-            display: flex; flex-direction: column; gap: 12px; border: 1px solid rgba(255,255,255,0.1);
-        }
-        .input-group { display: flex; align-items: center; justify-content: space-between; color: white; font-size: 13px; }
-        input[type="number"] {
-            background: #000; border: 1px solid var(--neon-blue); color: var(--neon-blue);
-            padding: 5px; border-radius: 5px; width: 60px; text-align: center;
-        }
-        .btn-main {
-            background: linear-gradient(45deg, #0051ff, #00d4ff);
-            color: white; border: none; padding: 12px; border-radius: 10px;
-            font-weight: bold; cursor: pointer; text-transform: uppercase;
-        }
-        .btn-reset { background: transparent; border: none; color: #777; cursor: pointer; font-size: 11px; text-decoration: underline; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+        #ui-header { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); width: 85%; background: rgba(0,0,0,0.85); border: 1px solid #00f2ff; padding: 15px; border-radius: 15px; color: white; text-align: center; pointer-events: none; }
+        .dose-val { font-size: 30px; color: #00ff00; font-weight: bold; }
+        #control-panel { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); width: 85%; background: rgba(20,20,20,0.95); padding: 15px; border-radius: 15px; display: flex; flex-direction: column; gap: 10px; z-index: 100; }
+        input { background: #333; color: white; border: 1px solid #555; padding: 10px; border-radius: 5px; text-align: center; }
+        button { background: #007bff; color: white; border: none; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        /* 중앙 고정 조준점 (선원 표시) */
+        #crosshair { position: fixed; top: 50%; left: 50%; width: 30px; height: 30px; border: 3px solid #00f2ff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 0 10px #00f2ff; }
     </style>
 </head>
-
 <body>
-
+    <div id="crosshair"></div>
     <div id="ui-header">
-        <div id="status-msg" class="status-text">SYSTEM READY: TAP TO PLACE</div>
-        <div class="dose-display"><span id="dose-val">0.00</span><span class="unit">mSv/hr</span></div>
-        <div id="dist-val" class="distance-info">DIST: - m</div>
+        <div id="status" style="color:#00f2ff; font-size:12px;">지점을 조준하고 '측정 시작'을 누르세요</div>
+        <div class="dose-val"><span id="dose-display">0.00</span> mSv/hr</div>
+        <div id="dist-display" style="color:#ddd;">거리: - m</div>
     </div>
 
     <div id="control-panel">
-        <div class="input-group">
-            <span>SET SOURCE INTENSITY (I₀)</span>
-            <input type="number" id="dose-input" value="10">
-        </div>
-        <button class="btn-main" onclick="applySettings()">APPLY & CALCULATE</button>
-        <button class="btn-reset" onclick="resetApp()">SYSTEM RESET</button>
+        <input type="number" id="dose-input" value="10" placeholder="선량 입력">
+        <button onclick="startMeasurement()">측정 시작 (지점 고정)</button>
+        <button onclick="resetMeasurement()" style="background:#555;">초기화</button>
     </div>
 
-    <a-scene 
-        embedded 
-        arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
-        vr-mode-ui="enabled: false">
-        
-        <a-entity id="source" visible="false">
-            <a-sphere radius="0.06" color="#00f2ff" opacity="0.9" animation="property: scale; to: 1.2 1.2 1.2; dir: alternate; dur: 800; loop: true"></a-sphere>
-            <a-ring color="#ff3c3c" rotation="-90 0 0" radius-inner="0.08" radius-outer="0.1" animation="property: scale; to: 1.3 1.3 1.3; dir: alternate; dur: 800; loop: true"></a-ring>
-            <a-circle color="white" opacity="0.2" rotation="-90 0 0" radius="0.3"></a-circle>
-        </a-entity>
-
-        <a-entity camera id="main-cam" look-controls wasd-controls="enabled: false"></a-entity>
+    <a-scene embedded vr-mode-ui="enabled: false" renderer="logarithmicDepthBuffer: true;">
+        <a-entity camera position="0 0 0" look-controls wasd-controls-enabled="false"></a-entity>
     </a-scene>
 
     <script>
-        const source = document.getElementById('source');
-        const statusMsg = document.getElementById('status-msg');
-        const doseDisplay = document.getElementById('dose-val');
-        const distDisplay = document.getElementById('dist-val');
-        const doseInput = document.getElementById('dose-input');
-        const cameraEntity = document.getElementById('main-cam');
-        
-        let targetPosition = new THREE.Vector3();
         let baseDose = 0;
-        let isApplied = false;
+        let isMeasuring = false;
+        let fixedSourcePos = new THREE.Vector3(); // 고정된 선원 위치
 
-        // 터치 시 선원 배치 (카메라의 현재 월드 좌표 기준)
-        window.addEventListener('touchstart', function(e) {
-            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
-            if (isApplied) return;
-
-            const camObj = cameraEntity.object3D;
-            // 카메라 앞 1.2m 지점 계산
-            const offset = new THREE.Vector3(0, 0, -1.2);
-            offset.applyQuaternion(camObj.quaternion);
+        function startMeasurement() {
+            baseDose = parseFloat(document.getElementById('dose-input').value);
             
-            targetPosition.copy(camObj.position).add(offset);
+            // 카메라 현재 위치에서 앞쪽 1.5m 지점을 선원 위치로 확정
+            const cam = document.querySelector('a-entity[camera]').object3D;
+            const forward = new THREE.Vector3(0, 0, -1.5).applyQuaternion(cam.quaternion);
+            fixedSourcePos.copy(cam.position).add(forward);
             
-            source.setAttribute('position', targetPosition);
-            source.setAttribute('visible', 'true');
-            
-            statusMsg.innerText = "LOCATION FIXED. PRESS APPLY.";
-            statusMsg.style.color = "#ffcc00";
-        });
-
-        function applySettings() {
-            if(!source.getAttribute('visible')) {
-                alert("Please tap the screen to place the source first!");
-                return;
-            }
-            baseDose = parseFloat(doseInput.value);
-            isApplied = true;
-            statusMsg.innerText = "REAL-TIME MONITORING ACTIVE";
-            statusMsg.style.color = "#00ff00";
+            isMeasuring = true;
+            document.getElementById('status').innerText = "측정 중: 이동하며 선량을 확인하세요";
         }
 
-        function resetApp() {
-            source.setAttribute('visible', 'false');
-            isApplied = false;
-            doseDisplay.innerText = "0.00";
-            distDisplay.innerText = "DIST: - m";
-            statusMsg.innerText = "SYSTEM READY: TAP TO PLACE";
-            statusMsg.style.color = "#00f2ff";
+        function resetMeasurement() {
+            isMeasuring = false;
+            document.getElementById('dose-display').innerText = "0.00";
+            document.getElementById('dist-display').innerText = "거리: - m";
+            document.getElementById('status').innerText = "지점을 조준하고 '측정 시작'을 누르세요";
         }
 
-        // 핵심: 매 프레임마다 카메라와 선원 사이의 '실제 거리'를 다시 계산
-        function tick() {
-            if (isApplied && source.getAttribute('visible')) {
-                const camPos = cameraEntity.object3D.position;
-                const dist = camPos.distanceTo(targetPosition);
+        function update() {
+            if (isMeasuring) {
+                const cam = document.querySelector('a-entity[camera]').object3D;
+                // 고정된 선원 위치와 카메라의 현재 위치 사이의 거리 계산
+                const dist = cam.position.distanceTo(fixedSourcePos);
                 
-                // 역자승 법칙 계산 (기준거리 0.5m)
+                // 역자승 법칙 (기준거리 0.5m)
                 const d0 = 0.5;
-                // 거리가 너무 0에 가까워지면 값이 무한대가 되므로 최소거리 0.1m 제한
-                const effectiveDist = Math.max(dist, 0.1); 
-                const dose = baseDose * Math.pow((d0 / effectiveDist), 2);
+                const dose = baseDose * Math.pow((d0 / Math.max(dist, 0.1)), 2);
                 
-                doseDisplay.innerText = dose.toFixed(2);
-                distDisplay.innerText = "DIST: " + dist.toFixed(2) + " m";
-
-                // 5 mSv/hr 이상 시 경고 색상
-                doseDisplay.style.color = dose >= 5 ? "var(--neon-red)" : "#00ff00";
+                document.getElementById('dose-display').innerText = dose.toFixed(2);
+                document.getElementById('dist-display').innerText = "거리: " + dist.toFixed(2) + " m";
             }
-            requestAnimationFrame(tick);
+            requestAnimationFrame(update);
         }
-        tick();
+        update();
     </script>
 </body>
 </html>
