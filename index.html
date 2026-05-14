@@ -10,7 +10,7 @@
         :root { --neon-blue: #00f2ff; --neon-red: #ff3c3c; --bg-dark: rgba(20, 25, 35, 0.9); }
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Roboto, sans-serif; }
 
-        /* 상단 디지털 선량계 레이아웃 */
+        /* 상단 디지털 선량계 */
         #ui-header {
             position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
             width: 85%; max-width: 450px; background: var(--bg-dark);
@@ -23,7 +23,7 @@
         .unit { font-size: 18px; margin-left: 5px; color: #aaa; }
         .distance-info { font-size: 14px; color: #ccc; margin-top: 5px; }
 
-        /* 하단 컨트롤 패널 (유려한 디자인) */
+        /* 하단 컨트롤 패널 */
         #control-panel {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
             width: 90%; max-width: 400px; background: var(--bg-dark);
@@ -37,29 +37,23 @@
             background: #000; border: 1px solid var(--neon-blue); color: var(--neon-blue);
             padding: 8px; border-radius: 8px; width: 80px; text-align: center; font-size: 16px;
         }
-
-        /* 하이테크 스타일 버튼 */
         .btn-main {
             background: linear-gradient(45deg, #0051ff, #00d4ff);
             color: white; border: none; padding: 12px; border-radius: 10px;
             font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.3s;
             text-transform: uppercase; letter-spacing: 1px;
         }
-        .btn-main:active { transform: scale(0.95); box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
         .btn-reset {
             background: transparent; border: 1px solid #666; color: #aaa;
             padding: 8px; border-radius: 10px; cursor: pointer; font-size: 12px;
         }
-
-        /* 카메라가 안 켜질 때를 대비한 캔버스 설정 */
-        .a-canvas { width: 100% !important; height: 100% !important; }
     </style>
 </head>
 
 <body>
 
     <div id="ui-header">
-        <div id="status-msg" class="status-text">SYSTEM READY: PLACE SOURCE</div>
+        <div id="status-msg" class="status-text">SYSTEM READY: TAP SCREEN</div>
         <div class="dose-display"><span id="dose-val">0.00</span><span class="unit">mSv/hr</span></div>
         <div id="dist-val" class="distance-info">DISTANCE: - m</div>
     </div>
@@ -75,21 +69,21 @@
 
     <a-scene 
         embedded 
-        arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
-        vr-mode-ui="enabled: false">
+        arjs="sourceType: webcam; debugUIEnabled: false;"
+        vr-mode-ui="enabled: false"
+        renderer="logarithmicDepthBuffer: true;">
         
         <a-entity id="source" visible="false">
-            <a-sphere radius="0.1" color="#00f2ff" opacity="0.8" animation="property: scale; to: 1.3 1.3 1.3; dir: alternate; dur: 800; loop: true"></a-sphere>
-            <a-ring color="#ff3c3c" rotation="-90 0 0" radius-inner="0.15" radius-outer="0.18" animation="property: scale; to: 1.5 1.5 1.5; dir: alternate; dur: 800; loop: true"></a-ring>
-            <a-circle color="white" opacity="0.2" rotation="-90 0 0" radius="0.5"></a-circle>
+            <a-sphere radius="0.12" color="#00f2ff" opacity="0.8" animation="property: scale; to: 1.3 1.3 1.3; dir: alternate; dur: 800; loop: true"></a-sphere>
+            <a-ring color="#ff3c3c" rotation="-90 0 0" radius-inner="0.18" radius-outer="0.22" animation="property: scale; to: 1.5 1.5 1.5; dir: alternate; dur: 800; loop: true"></a-ring>
+            <a-circle color="white" opacity="0.3" rotation="-90 0 0" radius="0.6"></a-circle>
         </a-entity>
 
         <a-entity camera position="0 1.6 0"></a-entity>
-        
-        <a-sky id="touch-area" opacity="0" class="clickable"></a-sky>
     </a-scene>
 
     <script>
+        const scene = document.querySelector('a-scene');
         const source = document.getElementById('source');
         const statusMsg = document.getElementById('status-msg');
         const doseDisplay = document.getElementById('dose-val');
@@ -100,34 +94,37 @@
         let baseDose = 0;
         let isApplied = false;
 
-        // 1. 지점 터치 (카메라 앞 1.5m 지점에 선원 생성)
-        document.getElementById('touch-area').addEventListener('click', function() {
-            if(isApplied) return;
-            
+        // 터치 인식 오류 해결: 화면 어디를 눌러도 인식되도록 window 레벨에서 감지
+        window.addEventListener('touchstart', function(e) {
+            // 버튼이나 입력창을 누를 때는 선원 배치가 되지 않도록 예외 처리
+            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+            if (isApplied) return;
+
             const cam = document.querySelector('a-entity[camera]').object3D;
-            const pos = new THREE.Vector3(0, 0, -1.5).applyQuaternion(cam.quaternion).add(cam.position);
+            // 카메라가 보는 방향으로 1.5m 지점의 좌표 계산
+            const vector = new THREE.Vector3(0, 0, -1.5);
+            vector.applyQuaternion(cam.quaternion);
+            const pos = new THREE.Vector3().copy(cam.position).add(vector);
             
             source.setAttribute('position', pos);
             source.setAttribute('visible', 'true');
             targetPosition = pos;
             
-            statusMsg.innerText = "LOCATION FIXED. SET VALUE AND APPLY.";
+            statusMsg.innerText = "LOCATION FIXED. PRESS APPLY.";
             statusMsg.style.color = "#ffcc00";
-        });
+        }, false);
 
-        // 2. 적용하기 버튼
         function applySettings() {
             if(!targetPosition) {
-                alert("Please touch the screen to place the source first!");
+                alert("Please tap the camera screen to place the source first!");
                 return;
             }
             baseDose = parseFloat(doseInput.value);
             isApplied = true;
-            statusMsg.innerText = "SCANNING... RADIATION DETECTED";
+            statusMsg.innerText = "SIMULATION ACTIVE";
             statusMsg.style.color = "#00ff00";
         }
 
-        // 3. 초기화
         function resetApp() {
             source.setAttribute('visible', 'false');
             isApplied = false;
@@ -135,24 +132,21 @@
             doseDisplay.innerText = "0.00";
             doseDisplay.style.color = "#00ff00";
             distDisplay.innerText = "DISTANCE: - m";
-            statusMsg.innerText = "SYSTEM READY: PLACE SOURCE";
+            statusMsg.innerText = "SYSTEM READY: TAP SCREEN";
             statusMsg.style.color = "#00f2ff";
         }
 
-        // 4. 실시간 거리/선량 연산
         function update() {
             if (isApplied && targetPosition) {
                 const cam = document.querySelector('a-entity[camera]').object3D;
                 const dist = cam.position.distanceTo(targetPosition);
                 
-                // 역자승 법칙 (기준거리 d0=0.5m)
-                const d0 = 0.5;
+                const d0 = 0.5; // 기준 거리 0.5m
                 const dose = (dist < 0.2) ? baseDose : baseDose * Math.pow((d0 / dist), 2);
                 
                 doseDisplay.innerText = dose.toFixed(2);
                 distDisplay.innerText = "DISTANCE: " + dist.toFixed(2) + " m";
 
-                // 위험 선량 경고 (5 mSv/hr 이상 시 빨간색)
                 if (dose >= 5) {
                     doseDisplay.style.color = "var(--neon-red)";
                 } else {
