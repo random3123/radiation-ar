@@ -183,31 +183,49 @@ function handleMotion(event) {
 
     if (dt <= 0 || dt > 0.1) return;
 
-    // 스마트폰 전후 이동(z축)만 사용
-    let zAcc = Math.abs(acc.z) < 0.08 ? 0 : acc.z;
+    // 스마트폰의 실제 전후 이동을 카메라 바라보는 방향 기준으로 계산
+    const cam = document.getElementById('main-camera').object3D;
 
-    // 정지 상태면 속도 즉시 제거
-    if (zAcc === 0) {
+    // gravity 제거 선형가속도 벡터
+    let accVector = new THREE.Vector3(
+        acc.x || 0,
+        acc.y || 0,
+        acc.z || 0
+    );
+
+    // 작은 노이즈 제거
+    if (accVector.length() < 0.06) {
         forwardVelocity = 0;
         return;
     }
 
-    // 속도 계산
-    forwardVelocity += zAcc * dt;
+    // 기기 좌표계를 월드 좌표계로 변환
+    accVector.applyQuaternion(cam.quaternion);
 
-    // 강한 감쇠
-    forwardVelocity *= 0.55;
+    // 카메라가 바라보는 정면 방향 벡터
+    const forward = new THREE.Vector3();
+    cam.getWorldDirection(forward);
+    forward.normalize();
+
+    // 전후 방향 성분만 추출 (dot product)
+    const forwardAcc = accVector.dot(forward);
+
+    // 속도 적분
+    forwardVelocity += forwardAcc * dt;
+
+    // 감쇠
+    forwardVelocity *= 0.72;
 
     // 미세 속도 제거
-    if (Math.abs(forwardVelocity) < 0.003) {
+    if (Math.abs(forwardVelocity) < 0.002) {
         forwardVelocity = 0;
         return;
     }
 
-    // 거리 업데이트
-    currentDistance += forwardVelocity * dt;
+    // 거리 변화
+    // 앞으로 이동하면 거리 감소, 뒤로 이동하면 증가
+    currentDistance -= forwardVelocity * dt;
 
-    // 최소/최대 거리 제한
     // 거리 제한: 최소 0.5m, 최대 10m
     currentDistance = Math.max(0.5, Math.min(currentDistance, 10));
 }
