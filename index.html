@@ -3,8 +3,10 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Radiation AR Pro (Direct Pointing)</title>
+    <title>Radiation AR Pro (Sensors Only)</title>
+    <!-- 카메라 호출 및 공간 인식을 위한 필수 라이브러리 -->
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
         #ui-header { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); width: 85%; background: rgba(0,0,0,0.85); border: 1px solid #00f2ff; padding: 15px; border-radius: 15px; color: white; text-align: center; z-index: 1000; pointer-events: none; }
@@ -13,7 +15,6 @@
         input { background: #333; color: white; border: 1px solid #555; padding: 12px; border-radius: 8px; text-align: center; font-size: 16px; }
         button { background: #007bff; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; }
         #crosshair { position: fixed; top: 50%; left: 50%; width: 20px; height: 20px; border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); z-index: 999; pointer-events: none; }
-        #crosshair::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: #00f2ff; border-radius: 50%; transform: translate(-50%, -50%); }
     </style>
 </head>
 <body>
@@ -27,50 +28,52 @@
     <div id="control-panel">
         <input type="number" id="dose-input" value="10" placeholder="기준 선량">
         <button onclick="startMeasurement()" style="background:#28a745;">측정 시작 (지점 고정)</button>
-        <button onclick="location.reload()" style="background:#444;">초기화</button>
+        <button onclick="location.reload()" style="background:#444;">카메라 재시작</button>
     </div>
 
-    <!-- 순수 A-Frame 카메라만 사용 (추적 엔진 없음) -->
-    <a-scene embedded renderer="antialias: true; logarithmicDepthBuffer: true;">
-        <a-entity id="main-camera" camera look-controls wasd-controls position="0 1.6 0"></a-entity>
+    <!-- 마커 추적 기능은 끄고 카메라(webcam)만 활성화 -->
+    <a-scene 
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
+        vr-mode-ui="enabled: false"
+        renderer="logarithmicDepthBuffer: true;">
+        
+        <a-entity camera id="main-camera" look-controls position="0 1.6 0"></a-entity>
     </a-scene>
 
     <script>
         let baseDose = 0;
         let isMeasuring = false;
-        let fixedSourcePos = new THREE.Vector3(); // 고정된 가상의 선원 위치
+        let fixedSourcePos = new THREE.Vector3();
         
         function startMeasurement() {
-            baseDose = parseFloat(document.getElementById('dose-input').value);
+            const input = document.getElementById('dose-input').value;
+            if(!input) { alert("선량을 입력하세요."); return; }
+            
+            baseDose = parseFloat(input);
             const cameraEl = document.getElementById('main-camera').object3D;
 
-            // 현재 카메라 위치에서 시선 방향(앞쪽) 1.5m 지점을 3차원 공간상의 좌표로 고정
-            const direction = new THREE.Vector3(0, 0, -1.5);
+            // 마커 대신 현재 조준하고 있는 방향의 가상 좌표를 선원으로 설정
+            const direction = new THREE.Vector3(0, 0, -1.5); // 카메라 앞 1.5m 지점
             direction.applyQuaternion(cameraEl.quaternion);
             fixedSourcePos.copy(cameraEl.position).add(direction);
 
             isMeasuring = true;
-            document.getElementById('status').innerText = "측정 지점 고정됨: 앞뒤로 이동해보세요";
+            document.getElementById('status').innerText = "측정 중: 이동하며 선량을 확인하세요";
             document.getElementById('status').style.color = "#00ff00";
         }
 
-        // 매 프레임 업데이트
         function updateLoop() {
             if (isMeasuring) {
                 const cam = document.getElementById('main-camera').object3D;
-                
-                // 고정된 선원 좌표와 카메라 현재 좌표 사이의 유클리드 거리 계산
+                // 실제 센서 기반 거리 계산
                 const dist = cam.position.distanceTo(fixedSourcePos);
                 
-                // 역자승 법칙 적용 (0.5m 기준)
-                const d0 = 0.5;
-                const dose = baseDose * Math.pow((d0 / Math.max(dist, 0.01)), 2);
+                const d0 = 0.5; // 기준 거리
+                const dose = baseDose * Math.pow((d0 / Math.max(dist, 0.1)), 2);
                 
-                // UI 업데이트
                 document.getElementById('dose-display').innerText = dose.toFixed(2);
                 document.getElementById('dist-display').innerText = `거리: ${dist.toFixed(2)} m`;
-                
-                // 위험 알림 색상
                 document.getElementById('dose-display').style.color = dose >= 15 ? "#ff3c3c" : "#00ff00";
             }
             requestAnimationFrame(updateLoop);
