@@ -173,10 +173,9 @@ function lockTarget() {
 
     baseDoseRate = parseFloat(document.getElementById('base-dose-input').value) || 0;
 
+    // 현재 조준 방향의 월드 좌표에 타겟 고정
     const forward = new THREE.Vector3(0, 0, -2);
     forward.applyQuaternion(camera.quaternion);
-
-    // 사용자가 조준한 방향 기준 약 2m 위치에 고정
     fixedSourcePos.copy(camera.position).add(forward);
 
     const marker = document.getElementById('target-marker');
@@ -199,31 +198,50 @@ function lockTarget() {
     targetLocked = true;
 
     document.getElementById('target-dose').innerText = `기준 선량: ${baseDoseRate.toFixed(2)} mSv/hr`;
-    document.getElementById('status').innerText = '타겟 고정 완료. 이동하며 거리 측정 중';
+    document.getElementById('status').innerText = '타겟 고정 완료. 실제 거리 추적 시작';
 }
+
 
 function update() {
     if (targetLocked) {
         const camera = document.getElementById('main-camera').object3D;
+        const marker = document.getElementById('target-marker');
         const label = document.getElementById('dose-label');
 
         const now = performance.now();
         const dtHours = (now - lastFrameTime) / 3600000;
         lastFrameTime = now;
 
+        // 실제 3D 공간 거리 계산
         let dist = camera.position.distanceTo(fixedSourcePos);
         dist = Math.max(0.5, Math.min(dist, 10));
 
+        // 타겟 마커는 고정 좌표 유지 (사용자가 멀어지면 시각적으로 작아보임)
+        marker.object3D.position.copy(fixedSourcePos);
+
+        // 라벨 위치 고정
+        label.object3D.position.copy(
+            fixedSourcePos.clone().add(new THREE.Vector3(0, 0.35, 0))
+        );
+
+        // 항상 사용자 방향 바라보기
+        label.object3D.lookAt(camera.position);
+
+        // 역자승 법칙 선량 계산
         const referenceDistance = 0.5;
         const currentDoseRate = baseDoseRate * Math.pow(referenceDistance / dist, 2);
 
         cumulativeDose += currentDoseRate * dtHours;
 
+        // UI 갱신
         document.getElementById('dose-rate').innerText = currentDoseRate.toFixed(2);
         document.getElementById('distance').innerText = `거리: ${dist.toFixed(2)} m`;
         document.getElementById('cumulative-dose').innerText = `누적 피폭량: ${cumulativeDose.toFixed(6)} mSv`;
 
-        label.object3D.lookAt(camera.position);
+        label.setAttribute(
+            'text',
+            `value: ${baseDoseRate.toFixed(1)} mSv/hr\n현재: ${currentDoseRate.toFixed(2)} mSv/hr; color: white; align: center; width: 6; side: double;`
+        );
 
         const doseEl = document.getElementById('dose-rate');
         if (currentDoseRate > 15) {
