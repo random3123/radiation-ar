@@ -191,13 +191,16 @@ function handleMotion(event) {
         acc.z || 0
     );
 
+    // 미세 흔들림 제거
     if (accVector.length() < 0.05) {
         velocity.set(0,0,0);
         return;
     }
 
+    // 기기 좌표를 월드 좌표로 변환
     accVector.applyQuaternion(cam.quaternion);
 
+    // 사용자 위치만 이동
     velocity.add(accVector.multiplyScalar(dt));
     velocity.multiplyScalar(0.78);
 
@@ -210,24 +213,32 @@ function handleMotion(event) {
         velocity.clone().multiplyScalar(dt)
     );
 
+    // 카메라만 이동
     cam.position.copy(estimatedUserPos);
 
+    // 고정 타겟과 현재 카메라 거리 계산
     currentDistance = cam.position.distanceTo(fixedSourcePos);
     currentDistance = Math.max(0.5, Math.min(currentDistance, 10));
 }
+
 
 function lockWallTarget() {
     baseDoseRate = parseFloat(document.getElementById('base-dose-input').value) || 0;
 
     const cam = document.getElementById('main-camera').object3D;
 
+    // 현재 카메라 위치를 사용자 시작 위치로 고정
+    estimatedUserPos.copy(cam.position);
+
     const forward = new THREE.Vector3();
     cam.getWorldDirection(forward);
 
-    // 벽면 타겟: 조준 방향 2m 전방 고정
+    // 사용자가 조준한 실제 공간 좌표를 고정 타겟으로 저장
     const wallDistance = 2.0;
-    fixedSourcePos.copy(cam.position).add(
-        forward.normalize().multiplyScalar(wallDistance)
+    fixedSourcePos.copy(
+        cam.position.clone().add(
+            forward.normalize().multiplyScalar(wallDistance)
+        )
     );
 
     const marker = document.getElementById('target-marker');
@@ -244,7 +255,7 @@ function lockWallTarget() {
     );
     label.setAttribute('visible', true);
 
-    currentDistance = wallDistance;
+    currentDistance = estimatedUserPos.distanceTo(fixedSourcePos);
     cumulativeDose = 0;
     measurementStartTime = performance.now();
     lastFrameTime = performance.now();
@@ -253,6 +264,7 @@ function lockWallTarget() {
     document.getElementById('target-dose').innerText = `기준 선량: ${baseDoseRate.toFixed(2)} mSv/hr`;
     document.getElementById('status').innerText = '벽면 타겟 측정 중';
 }
+
 
 function updateSimulation() {
     if (targetLocked) {
