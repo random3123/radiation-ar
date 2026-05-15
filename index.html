@@ -1,250 +1,273 @@
+
+
+
+
+
+
+
+
+
+# Radiation AR - Camera Fixed + Surface Target Version
+
+```html
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>WebXR 방사선 안전 시뮬레이션</title>
+    <title>Radiation AR - Camera Fixed</title>
+
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
-        #ui-container {
-            position: absolute; top: 10px; left: 10px; right: 10px;
-            z-index: 10; pointer-events: none;
-            color: white; text-shadow: 1px 1px 2px black;
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+            font-family: sans-serif;
         }
-        .info-panel {
-            background: rgba(0, 0, 0, 0.6); padding: 15px; border-radius: 8px;
-            margin-bottom: 10px; pointer-events: auto;
+
+        #camera-feed {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -2;
         }
-        input { width: 60px; padding: 5px; border-radius: 4px; border: none; }
-        .warning {
-            color: #ff4444; font-weight: bold; font-size: 1.2em;
-            display: none; text-align: center;
+
+        #crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            pointer-events: none;
         }
-        /* 알람 애니메이션 */
-        @keyframes flash {
-            0% { background: rgba(255, 0, 0, 0); }
-            50% { background: rgba(255, 0, 0, 0.5); }
-            100% { background: rgba(255, 0, 0, 0); }
+
+        #ui-header {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            background: rgba(0,0,0,0.82);
+            border: 1px solid #00f2ff;
+            border-radius: 14px;
+            padding: 14px;
+            color: white;
+            text-align: center;
+            z-index: 1001;
         }
-        .alarm-active {
-            animation: flash 0.5s infinite;
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 5;
+
+        .main-dose {
+            font-size: 30px;
+            font-weight: bold;
+            color: #00ff00;
+        }
+
+        #control-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            background: rgba(20,20,20,0.92);
+            border-radius: 14px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 1002;
+        }
+
+        input, button {
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            font-size: 15px;
+        }
+
+        input {
+            background: #333;
+            color: white;
+            text-align: center;
+        }
+
+        button {
+            font-weight: bold;
+            cursor: pointer;
+            color: white;
         }
     </style>
 </head>
 <body>
 
-    <div id="ui-container">
-        <div class="info-panel">
-            <div>선원 강도(D1): <input type="number" id="baseDose" value="100"> mSv/h (at 1m)</div>
-            <hr>
-            <div>현재 거리: <span id="distDisplay">0.00</span> m</div>
-            <div>실시간 선량률: <span id="rateDisplay">0.00</span> mSv/h</div>
-            <div style="font-size: 1.1em; color: #ffeb3b;">누적 선량: <span id="totalDoseDisplay">0.0000</span> mSv</div>
-            <div id="alarmText" class="warning">⚠️ 경고: 누적 선량 1mSv 초과!</div>
-        </div>
-        <div style="text-align: center; color: #ccc; font-size: 0.8em;">
-            화면을 터치하여 방사선원(빨간 구체)을 배치하세요.
-        </div>
-    </div>
-    <div id="alarmOverlay"></div>
+<video id="camera-feed" autoplay playsinline muted></video>
+<div id="crosshair"></div>
 
-    <!-- Three.js 및 WebXR 라이브러리 (CDN) -->
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-            }
-        }
-    </script>
+<div id="ui-header">
+    <div id="status">1. 카메라 시작 → 2. 타겟 지정</div>
+    <div class="main-dose"><span id="dose-rate">0.00</span> mSv/hr</div>
+    <div id="distance">거리: 0.00 m</div>
+    <div id="target-dose">기준 선량: 0.00 mSv/hr</div>
+    <div id="cumulative-dose">누적 피폭량: 0.000000 mSv</div>
+</div>
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { ARButton } from 'three/addons/webxr/ARButton.js';
+<div id="control-panel">
+    <input type="number" id="base-dose-input" value="10" step="0.1" min="0">
+    <button onclick="startCamera()" style="background:#007bff;">1. 카메라 시작</button>
+    <button onclick="lockTarget()" style="background:#28a745;">2. 타겟 지정</button>
+    <button onclick="location.reload()" style="background:#444;">초기화</button>
+</div>
 
-        let container;
-        let camera, scene, renderer;
-        let reticle, sourceMesh;
-        let hitTestSource = null;
-        let hitTestSourceRequested = false;
+<a-scene embedded vr-mode-ui="enabled: false" renderer="alpha: true; antialias: true;">
+    <a-camera id="main-camera" position="0 1.6 0" look-controls></a-camera>
 
-        // 시뮬레이션 변수
-        let baseDoseRate = 100; // mSv/h (at 1m)
-        let accumulatedDose = 0; // mSv
-        let lastTime = Date.now();
-        let sourcePosition = null;
-        let isAlarmActive = false;
+    <a-sphere id="target-marker"
+              radius="0.25"
+              color="red"
+              visible="false"
+              material="shader: standard; emissive: red; emissiveIntensity: 2;">
+    </a-sphere>
 
-        // 오디오 설정
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        function playAlarmSound() {
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.1);
-        }
+    <a-entity id="dose-label"
+              visible="false"
+              text="value: ; color: white; align: center; width: 6; side: double;">
+    </a-entity>
+</a-scene>
 
-        init();
-        animate();
+<script>
+let fixedSourcePos = new THREE.Vector3();
+let baseDoseRate = 0;
+let targetLocked = false;
+let cumulativeDose = 0;
+let lastFrameTime = performance.now();
+let measurementStartTime = null;
 
-        function init() {
-            container = document.createElement('div');
-            document.body.appendChild(container);
+async function startCamera() {
+    try {
+        const video = document.getElementById('camera-feed');
 
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: { ideal: 'environment' }
+            },
+            audio: false
+        });
 
-            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-            scene.add(light);
+        video.srcObject = stream;
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.xr.enabled = true;
-            container.appendChild(renderer.domElement);
-
-            // AR 시작 버튼 추가
-            document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
-
-            // 선원 모델 (반투명 빨간 구체)
-            const geometry = new THREE.SphereGeometry(0.1, 32, 32);
-            const material = new THREE.MeshBasicMaterial({ 
-                color: 0xff0000, 
-                transparent: true, 
-                opacity: 0.6 
-            });
-            sourceMesh = new THREE.Mesh(geometry, material);
-            sourceMesh.visible = false;
-            scene.add(sourceMesh);
-
-            // 타겟(Reticle) - 바닥 인식용
-            reticle = new THREE.Mesh(
-                new THREE.RingGeometry(0.05, 0.07, 32).rotateX(-Math.PI / 2),
-                new THREE.MeshBasicMaterial()
-            );
-            reticle.matrixAutoUpdate = false;
-            reticle.visible = false;
-            scene.add(reticle);
-
-            // 화면 터치 시 선원 배치
-            const controller = renderer.xr.getController(0);
-            controller.addEventListener('select', onSelect);
-            scene.add(controller);
-
-            window.addEventListener('resize', onWindowResize);
-            
-            // 입력 바인딩
-            document.getElementById('baseDose').addEventListener('input', (e) => {
-                baseDoseRate = parseFloat(e.target.value) || 0;
-            });
+        if (
+            typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function'
+        ) {
+            await DeviceOrientationEvent.requestPermission();
         }
 
-        function onSelect() {
-            if (reticle.visible) {
-                sourcePosition = new THREE.Vector3();
-                sourcePosition.setFromMatrixPosition(reticle.matrix);
-                sourceMesh.position.copy(sourcePosition);
-                sourceMesh.visible = true;
-                
-                // 오디오 컨텍스트 재개 (브라우저 보안 정책)
-                if (audioCtx.state === 'suspended') audioCtx.resume();
-            }
+        document.getElementById('status').innerText = '카메라 활성화 완료. 타겟을 조준하세요.';
+    } catch (err) {
+        alert('카메라 실행 실패: HTTPS 또는 권한 허용 필요');
+        console.error(err);
+    }
+}
+
+function lockTarget() {
+    const camera = document.getElementById('main-camera').object3D;
+
+    baseDoseRate = parseFloat(document.getElementById('base-dose-input').value) || 0;
+
+    // 현재 조준 방향의 월드 좌표에 타겟 고정
+    const forward = new THREE.Vector3(0, 0, -2);
+    forward.applyQuaternion(camera.quaternion);
+    fixedSourcePos.copy(camera.position).add(forward);
+
+    const marker = document.getElementById('target-marker');
+    marker.object3D.position.copy(fixedSourcePos);
+    marker.setAttribute('visible', true);
+
+    const label = document.getElementById('dose-label');
+    label.object3D.position.copy(
+        fixedSourcePos.clone().add(new THREE.Vector3(0, 0.35, 0))
+    );
+    label.setAttribute(
+        'text',
+        `value: ${baseDoseRate.toFixed(1)} mSv/hr; color: white; align: center; width: 6; side: double;`
+    );
+    label.setAttribute('visible', true);
+
+    cumulativeDose = 0;
+    lastFrameTime = performance.now();
+    measurementStartTime = performance.now();
+    targetLocked = true;
+
+    document.getElementById('target-dose').innerText = `기준 선량: ${baseDoseRate.toFixed(2)} mSv/hr`;
+    document.getElementById('status').innerText = '타겟 고정 완료. 실제 거리 추적 시작';
+}
+
+
+function update() {
+    if (targetLocked) {
+        const camera = document.getElementById('main-camera').object3D;
+        const marker = document.getElementById('target-marker');
+        const label = document.getElementById('dose-label');
+
+        const now = performance.now();
+        const dtHours = (now - lastFrameTime) / 3600000;
+        lastFrameTime = now;
+
+        // 실제 3D 공간 거리 계산
+        let dist = camera.position.distanceTo(fixedSourcePos);
+        dist = Math.max(0.5, Math.min(dist, 10));
+
+        // 타겟 마커는 고정 좌표 유지 (사용자가 멀어지면 시각적으로 작아보임)
+        marker.object3D.position.copy(fixedSourcePos);
+
+        // 라벨 위치 고정
+        label.object3D.position.copy(
+            fixedSourcePos.clone().add(new THREE.Vector3(0, 0.35, 0))
+        );
+
+        // 항상 사용자 방향 바라보기
+        label.object3D.lookAt(camera.position);
+
+        // 역자승 법칙 선량 계산
+        const referenceDistance = 0.5;
+        const currentDoseRate = baseDoseRate * Math.pow(referenceDistance / dist, 2);
+
+        cumulativeDose += currentDoseRate * dtHours;
+
+        // UI 갱신
+        document.getElementById('dose-rate').innerText = currentDoseRate.toFixed(2);
+        document.getElementById('distance').innerText = `거리: ${dist.toFixed(2)} m`;
+        document.getElementById('cumulative-dose').innerText = `누적 피폭량: ${cumulativeDose.toFixed(6)} mSv`;
+
+        label.setAttribute(
+            'text',
+            `value: ${baseDoseRate.toFixed(1)} mSv/hr\n현재: ${currentDoseRate.toFixed(2)} mSv/hr; color: white; align: center; width: 6; side: double;`
+        );
+
+        const doseEl = document.getElementById('dose-rate');
+        if (currentDoseRate > 15) {
+            doseEl.style.color = '#ff3c3c';
+        } else if (currentDoseRate > 5) {
+            doseEl.style.color = '#ffaa00';
+        } else {
+            doseEl.style.color = '#00ff00';
         }
+    }
 
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
+    requestAnimationFrame(update);
+}
 
-        function animate() {
-            renderer.setAnimationLoop(render);
-        }
+update();
+</script>
 
-        function render(timestamp, frame) {
-            if (frame) {
-                const referenceSpace = renderer.xr.getReferenceSpace();
-                const session = renderer.xr.getSession();
-
-                // Hit Test 로직
-                if (hitTestSourceRequested === false) {
-                    session.requestReferenceSpace('viewer').then((referenceSpace) => {
-                        session.requestHitTestSource({ space: referenceSpace }).then((source) => {
-                            hitTestSource = source;
-                        });
-                    });
-                    session.addEventListener('end', () => {
-                        hitTestSourceRequested = false;
-                        hitTestSource = null;
-                    });
-                    hitTestSourceRequested = true;
-                }
-
-                if (hitTestSource) {
-                    const hitTestResults = frame.getHitTestResults(hitTestSource);
-                    if (hitTestResults.length) {
-                        const hit = hitTestResults[0];
-                        reticle.visible = true;
-                        reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
-                    } else {
-                        reticle.visible = false;
-                    }
-                }
-
-                // 선량 계산 로직
-                updatePhysics();
-            }
-
-            renderer.render(scene, camera);
-        }
-
-        function updatePhysics() {
-            const currentTime = Date.now();
-            const deltaTime = (currentTime - lastTime) / 1000; // 초 단위
-            lastTime = currentTime;
-
-            if (sourceMesh.visible) {
-                // 1. 거리 측정 (카메라와 선원 사이)
-                const camPos = new THREE.Vector3();
-                camera.getWorldPosition(camPos);
-                const distance = camPos.distanceTo(sourceMesh.position);
-                
-                // 최소 거리 제한 (0으로 나누기 방지 및 물리적 충돌 고려)
-                const safeDist = Math.max(distance, 0.1);
-                
-                // 2. 거리 역자승 법칙: D2 = D1 * (1 / d^2)
-                const currentRate = baseDoseRate / Math.pow(safeDist, 2);
-                
-                // 3. 누적 선량 계산 (mSv/h 이므로 3600으로 나눔)
-                const addedDose = (currentRate / 3600) * deltaTime;
-                accumulatedDose += addedDose;
-
-                // UI 업데이트
-                document.getElementById('distDisplay').innerText = distance.toFixed(2);
-                document.getElementById('rateDisplay').innerText = currentRate.toFixed(2);
-                document.getElementById('totalDoseDisplay').innerText = accumulatedDose.toFixed(6);
-
-                // 4. 알람 로직 (1mSv 초과 시)
-                if (accumulatedDose >= 1.0) {
-                    if (!isAlarmActive) {
-                        isAlarmActive = true;
-                        document.getElementById('alarmOverlay').classList.add('alarm-active');
-                        document.getElementById('alarmText').style.display = 'block';
-                    }
-                    // 주기적 비프음 (약 0.5초 간격)
-                    if (Math.floor(currentTime / 500) % 2 === 0) {
-                        playAlarmSound();
-                    }
-                }
-            }
-        }
-    </script>
 </body>
 </html>
+```
