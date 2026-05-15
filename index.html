@@ -3,16 +3,30 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Radiation AR - Fixed Source</title>
+    <title>Radiation AR - Camera Fix</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: black; font-family: sans-serif; }
+        
+        /* 실시간 카메라 배경 */
+        #camera-video {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover; z-index: -2;
+        }
+
+        /* 에러 로그 표시창 (카메라가 안 켜질 때 원인 확인용) */
+        #debug-log {
+            position: fixed; top: 0; left: 0; width: 100%; background: rgba(255,0,0,0.8);
+            color: white; font-size: 12px; z-index: 2000; padding: 5px; display: none;
+        }
+
         #ui-header {
-            position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
-            width: 90%; background: rgba(0,0,0,0.85); border: 1px solid #00f2ff;
+            position: fixed; top: 40px; left: 50%; transform: translateX(-50%);
+            width: 90%; background: rgba(0,0,0,0.8); border: 1px solid #00f2ff;
             border-radius: 12px; padding: 12px; color: white; text-align: center; z-index: 1001;
         }
         .main-dose { font-size: 32px; font-weight: bold; color: #00ff00; }
+        
         #control-panel {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
             width: 90%; background: rgba(20,20,20,0.9); border-radius: 12px;
@@ -23,32 +37,27 @@
 </head>
 <body>
 
+<div id="debug-log"></div>
+<video id="camera-video" autoplay playsinline muted></video>
+
 <div id="ui-header">
-    <div id="status">1. AR 시작 → 2. 타겟 고정</div>
+    <div id="status">1. 카메라/센서 허용 필수</div>
     <div class="main-dose"><span id="dose-rate">0.00</span> mSv/hr</div>
     <div id="distance">거리: 0.00 m</div>
 </div>
 
 <div id="control-panel">
-    <input type="number" id="base-dose-input" value="10" style="padding:10px; border-radius:5px; text-align:center;">
-    <button onclick="startARSession()" style="background:#007bff;">1. AR 시작 (이동 추적 활성화)</button>
-    <button onclick="lockTargetInSpace()" style="background:#28a745;">2. 현재 위치에 타겟 고정</button>
+    <input type="number" id="base-dose-input" value="10" style="padding:10px; text-align:center;">
+    <button id="btn-init" onclick="initCameraAndSensors()" style="background:#007bff;">1. 카메라 & 센서 켜기</button>
+    <button id="btn-lock" onclick="lockTargetInSpace()" style="background:#28a745; display:none;">2. 현재 위치에 타겟 고정</button>
     <button onclick="location.reload()" style="background:#444;">초기화</button>
 </div>
 
-<a-scene webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #ui-header"
-         renderer="alpha: true; antialias: true"
-         vr-mode-ui="enabled: false">
+<a-scene embedded vr-mode-ui="enabled: false" renderer="alpha: true;">
+    <a-entity id="main-camera" camera look-controls position="0 1.6 0"></a-entity>
     
-    <a-entity id="camera-rig">
-        <a-entity id="main-camera" camera look-controls position="0 1.6 0"></a-entity>
-    </a-entity>
-
     <a-sphere id="target-marker" radius="0.15" color="red" visible="false"
               material="emissive: red; emissiveIntensity: 2;"></a-sphere>
-
-    <a-entity id="dose-label" visible="false"
-              text="value: ; color: white; align: center; width: 4;"></a-entity>
 </a-scene>
 
 <script>
@@ -56,75 +65,76 @@ let fixedSourcePos = new THREE.Vector3();
 let baseDoseRate = 0;
 let targetLocked = false;
 
-// 1. AR 모드 진입 (이걸 해야 폰을 들고 걸을 때 좌표가 바뀝니다)
-function startARSession() {
-    const sceneEl = document.querySelector('a-scene');
-    if (sceneEl.is('ar-mode')) {
-        alert("이미 AR 모드입니다.");
-    } else {
-        // WebXR AR 세션 시작
-        sceneEl.enterVR(); 
-        document.getElementById('status').innerText = "공간 인식 중... 벽면을 조준하세요.";
+function logError(msg) {
+    const logEl = document.getElementById('debug-log');
+    logEl.style.display = 'block';
+    logEl.innerText = "Error: " + msg;
+}
+
+// 1. 카메라 및 센서 초기화 (사용자 클릭으로 실행)
+async function initCameraAndSensors() {
+    try {
+        // 카메라 권한 요청
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'environment' }, 
+            audio: false 
+        });
+        document.getElementById('camera-video').srcObject = stream;
+
+        // 센서 권한 요청 (iOS 13+ 필수)
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            const permission = await DeviceOrientationEvent.requestPermission();
+            if (permission !== 'granted') throw new Error("센서 권한이 거부되었습니다.");
+        }
+
+        document.getElementById('status').innerText = "카메라 활성화됨. 타겟을 지정하세요.";
+        document.getElementById('btn-init').style.display = 'none';
+        document.getElementById('btn-lock').style.display = 'block';
+
+    } catch (err) {
+        logError(err.name + ": " + err.message);
+        alert("카메라를 켤 수 없습니다. HTTPS 환경인지, 권한을 허용했는지 확인하세요.");
     }
 }
 
-// 2. 타겟 고정 (카메라와 분리하여 세계 좌표에 박아버림)
+// 2. 타겟 고정 (공간 좌표에 박아버림)
 function lockTargetInSpace() {
     baseDoseRate = parseFloat(document.getElementById('base-dose-input').value) || 0;
     const camera = document.getElementById('main-camera').object3D;
     
-    // 현재 카메라의 위치와 방향을 가져옴
-    const worldPos = new THREE.Vector3();
-    camera.getWorldPosition(worldPos);
-    
-    const direction = new THREE.Vector3(0, 0, -1);
-    direction.applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()));
-    
-    // 카메라 앞 1m 지점에 선원을 고정 (이 좌표는 이제 변하지 않음)
-    fixedSourcePos.copy(worldPos).add(direction.multiplyScalar(1.0));
+    // 현재 카메라의 위치와 정면 방향(2m 앞)으로 선원 좌표 설정
+    const forward = new THREE.Vector3(0, 0, -2);
+    forward.applyQuaternion(camera.quaternion);
+    fixedSourcePos.copy(camera.position).add(forward);
 
-    // 마커를 해당 '세계 좌표'로 이동
     const marker = document.getElementById('target-marker');
     marker.object3D.position.copy(fixedSourcePos);
     marker.setAttribute('visible', true);
 
-    const label = document.getElementById('dose-label');
-    label.object3D.position.copy(fixedSourcePos).add(new THREE.Vector3(0, 0.3, 0));
-    label.setAttribute('visible', true);
-
     targetLocked = true;
-    document.getElementById('status').innerText = "타겟 고정 완료! 이제 뒤로 물러나보세요.";
+    document.getElementById('status').innerText = "타겟 고정됨. 뒤로 물러나 보세요.";
 }
 
-function updateLoop() {
+// 3. 거리 계산 루프
+function update() {
     if (targetLocked) {
         const camera = document.getElementById('main-camera').object3D;
-        const camWorldPos = new THREE.Vector3();
-        camera.getWorldPosition(camWorldPos);
-
-        // [중요] 고정된 선원 좌표와 이동하는 카메라 좌표 사이의 거리 계산
-        const dist = camWorldPos.distanceTo(fixedSourcePos);
         
-        // 역자승 법칙 계산 (기준거리 0.5m)
+        // 카메라와 고정된 선원 사이의 거리 측정
+        const dist = camera.position.distanceTo(fixedSourcePos);
+        
+        // 역자승 법칙 적용 (기준거리 0.5m)
         const d0 = 0.5;
         const currentDoseRate = baseDoseRate * Math.pow(d0 / Math.max(dist, 0.1), 2);
 
-        // UI 업데이트
         document.getElementById('dose-rate').innerText = currentDoseRate.toFixed(2);
         document.getElementById('distance').innerText = `거리: ${dist.toFixed(2)} m`;
-
-        // 라벨 텍스트 업데이트 및 카메라 응시
-        const label = document.getElementById('dose-label');
-        label.setAttribute('text', `value: ${currentDoseRate.toFixed(2)} mSv/hr; align: center; width: 4;`);
-        label.object3D.lookAt(camWorldPos);
-
-        // 색상 경고
         document.getElementById('dose-rate').style.color = currentDoseRate > 15 ? "#ff3c3c" : "#00ff00";
     }
-    requestAnimationFrame(updateLoop);
+    requestAnimationFrame(update);
 }
 
-updateLoop();
+update();
 </script>
 </body>
 </html>
