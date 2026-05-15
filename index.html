@@ -1,54 +1,264 @@
-아이고, 코드는 멀쩡한데 화면이 계속 까맣게 나오면 정말 답답하시겠어요. 🤦‍♂️
-카메라가 안 켜지는 이유는 코드 자체의 문제보다 **"실행 환경"** 때문일 확률이 99%입니다. 브라우저는 보안상 아무 사이트나 카메라를 켜게 두지 않거든요.
-문제를 해결하기 위해 가장 중요한 **3가지 체크리스트**와, 카메라 작동 여부를 즉시 확인할 수 있는 **진단용 코드**를 드릴게요.
-### 🚨 이것부터 확인해 보세요! (필수 체크리스트)
- 1. **반드시 https:// 주소인가요?**
-   * 카메라는 보안 프로토콜(HTTPS)에서만 작동합니다. 주소창이 http://로 시작하거나, 파일을 그냥 더블 클릭해서 열었을 때(file:///...)는 절대 안 켜집니다.
-   * **해결책:** GitHub Pages에 올리거나, Vercel/Netlify 같은 무료 호환 도구에 올려서 테스트하세요.
- 2. **혹시 '네이버 앱'이나 '카카오톡'에서 열었나요?**
-   * 이런 앱 안의 브라우저는 카메라 권한을 막아두는 경우가 많습니다.
-   * **해결책:** 반드시 **Chrome(안드로이드)** 또는 **Safari(아이폰)** 앱을 따로 열어서 주소를 입력해 보세요.
- 3. **이미 카메라를 다른 앱이 쓰고 있나요?**
-   * 줌(Zoom), 팀즈, 혹은 기본 카메라 앱이 켜져 있으면 웹 브라우저가 카메라를 뺏어오지 못합니다. 다 끄고 새로고침해 보세요.
-### 🛠️ 카메라 작동 확인용 "초간단" 진단 코드
-AR 기능을 다 빼고, **일단 카메라가 나오는지부터 확인**하는 코드입니다. 이 코드로도 안 나오면 브라우저 설정이나 HTTPS 문제입니다.
+# Radiation AR - Camera Fixed + Surface Target Version
+
 ```html
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-    <title>Camera Test</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<body style="margin:0; background:black; color:white; text-align:center;">
-    <h3>카메라 진단 모드</h3>
-    <video id="test-video" autoplay playsinline style="width:100%; max-width:500px; border:2px solid #00f2ff;"></video>
-    <div id="err-msg" style="color:red; margin-top:20px;"></div>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Radiation AR - Camera Fixed</title>
 
-    <script>
-        async function startCamera() {
-            const video = document.getElementById('test-video');
-            const errMsg = document.getElementById('err-msg');
-            
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment' } 
-                });
-                video.srcObject = stream;
-                console.log("카메라 연결 성공!");
-            } catch (err) {
-                errMsg.innerText = "에러 발생: " + err.name + "\n" + err.message + 
-                                   "\n\n(HTTPS 주소인지, 권한 허용을 눌렀는지 확인하세요!)";
-            }
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+            font-family: sans-serif;
         }
-        
-        // 페이지 로드 시 즉시 실행
-        window.onload = startCamera;
-    </script>
+
+        #camera-feed {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -2;
+        }
+
+        #crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        #ui-header {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            background: rgba(0,0,0,0.82);
+            border: 1px solid #00f2ff;
+            border-radius: 14px;
+            padding: 14px;
+            color: white;
+            text-align: center;
+            z-index: 1001;
+        }
+
+        .main-dose {
+            font-size: 30px;
+            font-weight: bold;
+            color: #00ff00;
+        }
+
+        #control-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            background: rgba(20,20,20,0.92);
+            border-radius: 14px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 1002;
+        }
+
+        input, button {
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            font-size: 15px;
+        }
+
+        input {
+            background: #333;
+            color: white;
+            text-align: center;
+        }
+
+        button {
+            font-weight: bold;
+            cursor: pointer;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+<video id="camera-feed" autoplay playsinline muted></video>
+<div id="crosshair"></div>
+
+<div id="ui-header">
+    <div id="status">1. 카메라 시작 → 2. 타겟 지정</div>
+    <div class="main-dose"><span id="dose-rate">0.00</span> mSv/hr</div>
+    <div id="distance">거리: 0.00 m</div>
+    <div id="target-dose">기준 선량: 0.00 mSv/hr</div>
+    <div id="cumulative-dose">누적 피폭량: 0.000000 mSv</div>
+</div>
+
+<div id="control-panel">
+    <input type="number" id="base-dose-input" value="10" step="0.1" min="0">
+    <button onclick="startCamera()" style="background:#007bff;">1. 카메라 시작</button>
+    <button onclick="lockTarget()" style="background:#28a745;">2. 타겟 지정</button>
+    <button onclick="location.reload()" style="background:#444;">초기화</button>
+</div>
+
+<a-scene embedded vr-mode-ui="enabled: false" renderer="alpha: true; antialias: true;">
+    <a-camera id="main-camera" position="0 1.6 0" look-controls></a-camera>
+
+    <a-sphere id="target-marker"
+              radius="0.25"
+              color="red"
+              visible="false"
+              material="shader: standard; emissive: red; emissiveIntensity: 2;">
+    </a-sphere>
+
+    <a-entity id="dose-label"
+              visible="false"
+              text="value: ; color: white; align: center; width: 6; side: double;">
+    </a-entity>
+</a-scene>
+
+<script>
+let fixedSourcePos = new THREE.Vector3();
+let baseDoseRate = 0;
+let targetLocked = false;
+let cumulativeDose = 0;
+let lastFrameTime = performance.now();
+let measurementStartTime = null;
+
+async function startCamera() {
+    try {
+        const video = document.getElementById('camera-feed');
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: { ideal: 'environment' }
+            },
+            audio: false
+        });
+
+        video.srcObject = stream;
+
+        if (
+            typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function'
+        ) {
+            await DeviceOrientationEvent.requestPermission();
+        }
+
+        document.getElementById('status').innerText = '카메라 활성화 완료. 타겟을 조준하세요.';
+    } catch (err) {
+        alert('카메라 실행 실패: HTTPS 또는 권한 허용 필요');
+        console.error(err);
+    }
+}
+
+function lockTarget() {
+    const camera = document.getElementById('main-camera').object3D;
+
+    baseDoseRate = parseFloat(document.getElementById('base-dose-input').value) || 0;
+
+    // 현재 조준 방향의 월드 좌표에 타겟 고정
+    const forward = new THREE.Vector3(0, 0, -2);
+    forward.applyQuaternion(camera.quaternion);
+    fixedSourcePos.copy(camera.position).add(forward);
+
+    const marker = document.getElementById('target-marker');
+    marker.object3D.position.copy(fixedSourcePos);
+    marker.setAttribute('visible', true);
+
+    const label = document.getElementById('dose-label');
+    label.object3D.position.copy(
+        fixedSourcePos.clone().add(new THREE.Vector3(0, 0.35, 0))
+    );
+    label.setAttribute(
+        'text',
+        `value: ${baseDoseRate.toFixed(1)} mSv/hr; color: white; align: center; width: 6; side: double;`
+    );
+    label.setAttribute('visible', true);
+
+    cumulativeDose = 0;
+    lastFrameTime = performance.now();
+    measurementStartTime = performance.now();
+    targetLocked = true;
+
+    document.getElementById('target-dose').innerText = `기준 선량: ${baseDoseRate.toFixed(2)} mSv/hr`;
+    document.getElementById('status').innerText = '타겟 고정 완료. 실제 거리 추적 시작';
+}
+
+
+function update() {
+    if (targetLocked) {
+        const camera = document.getElementById('main-camera').object3D;
+        const marker = document.getElementById('target-marker');
+        const label = document.getElementById('dose-label');
+
+        const now = performance.now();
+        const dtHours = (now - lastFrameTime) / 3600000;
+        lastFrameTime = now;
+
+        // 실제 3D 공간 거리 계산
+        let dist = camera.position.distanceTo(fixedSourcePos);
+        dist = Math.max(0.5, Math.min(dist, 10));
+
+        // 타겟 마커는 고정 좌표 유지 (사용자가 멀어지면 시각적으로 작아보임)
+        marker.object3D.position.copy(fixedSourcePos);
+
+        // 라벨 위치 고정
+        label.object3D.position.copy(
+            fixedSourcePos.clone().add(new THREE.Vector3(0, 0.35, 0))
+        );
+
+        // 항상 사용자 방향 바라보기
+        label.object3D.lookAt(camera.position);
+
+        // 역자승 법칙 선량 계산
+        const referenceDistance = 0.5;
+        const currentDoseRate = baseDoseRate * Math.pow(referenceDistance / dist, 2);
+
+        cumulativeDose += currentDoseRate * dtHours;
+
+        // UI 갱신
+        document.getElementById('dose-rate').innerText = currentDoseRate.toFixed(2);
+        document.getElementById('distance').innerText = `거리: ${dist.toFixed(2)} m`;
+        document.getElementById('cumulative-dose').innerText = `누적 피폭량: ${cumulativeDose.toFixed(6)} mSv`;
+
+        label.setAttribute(
+            'text',
+            `value: ${baseDoseRate.toFixed(1)} mSv/hr\n현재: ${currentDoseRate.toFixed(2)} mSv/hr; color: white; align: center; width: 6; side: double;`
+        );
+
+        const doseEl = document.getElementById('dose-rate');
+        if (currentDoseRate > 15) {
+            doseEl.style.color = '#ff3c3c';
+        } else if (currentDoseRate > 5) {
+            doseEl.style.color = '#ffaa00';
+        } else {
+            doseEl.style.color = '#00ff00';
+        }
+    }
+
+    requestAnimationFrame(update);
+}
+
+update();
+</script>
+
 </body>
 </html>
-
 ```
-### 💡 해결을 위한 가이드
- * **컴퓨터에서 개발 중이라면:** VS Code의 Live Server 확장 프로그램을 쓰더라도 localhost가 아니면 카메라가 안 뜹니다. 스마트폰으로 보려면 외부 서버(GitHub 등)에 올리는 게 가장 속 편합니다.
- * **아이폰이라면:** 설정 -> Safari -> 카메라 -> '허용' 혹은 '묻기'로 되어 있는지 꼭 보세요.
-이 진단 코드를 복사해서 실행했을 때 화면이 나오나요? 만약 여기서도 에러 메시지가 뜬다면 그 메시지를 저한테 알려주세요. 바로 잡아드릴게요! 🧐
