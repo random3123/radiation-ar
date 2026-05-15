@@ -1,140 +1,54 @@
+아이고, 코드는 멀쩡한데 화면이 계속 까맣게 나오면 정말 답답하시겠어요. 🤦‍♂️
+카메라가 안 켜지는 이유는 코드 자체의 문제보다 **"실행 환경"** 때문일 확률이 99%입니다. 브라우저는 보안상 아무 사이트나 카메라를 켜게 두지 않거든요.
+문제를 해결하기 위해 가장 중요한 **3가지 체크리스트**와, 카메라 작동 여부를 즉시 확인할 수 있는 **진단용 코드**를 드릴게요.
+### 🚨 이것부터 확인해 보세요! (필수 체크리스트)
+ 1. **반드시 https:// 주소인가요?**
+   * 카메라는 보안 프로토콜(HTTPS)에서만 작동합니다. 주소창이 http://로 시작하거나, 파일을 그냥 더블 클릭해서 열었을 때(file:///...)는 절대 안 켜집니다.
+   * **해결책:** GitHub Pages에 올리거나, Vercel/Netlify 같은 무료 호환 도구에 올려서 테스트하세요.
+ 2. **혹시 '네이버 앱'이나 '카카오톡'에서 열었나요?**
+   * 이런 앱 안의 브라우저는 카메라 권한을 막아두는 경우가 많습니다.
+   * **해결책:** 반드시 **Chrome(안드로이드)** 또는 **Safari(아이폰)** 앱을 따로 열어서 주소를 입력해 보세요.
+ 3. **이미 카메라를 다른 앱이 쓰고 있나요?**
+   * 줌(Zoom), 팀즈, 혹은 기본 카메라 앱이 켜져 있으면 웹 브라우저가 카메라를 뺏어오지 못합니다. 다 끄고 새로고침해 보세요.
+### 🛠️ 카메라 작동 확인용 "초간단" 진단 코드
+AR 기능을 다 빼고, **일단 카메라가 나오는지부터 확인**하는 코드입니다. 이 코드로도 안 나오면 브라우저 설정이나 HTTPS 문제입니다.
+```html
 <!DOCTYPE html>
-<html lang="ko">
+<html>
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Radiation AR - Camera Fix</title>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <style>
-        body { margin: 0; overflow: hidden; background: black; font-family: sans-serif; }
-        
-        /* 실시간 카메라 배경 */
-        #camera-video {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover; z-index: -2;
-        }
-
-        /* 에러 로그 표시창 (카메라가 안 켜질 때 원인 확인용) */
-        #debug-log {
-            position: fixed; top: 0; left: 0; width: 100%; background: rgba(255,0,0,0.8);
-            color: white; font-size: 12px; z-index: 2000; padding: 5px; display: none;
-        }
-
-        #ui-header {
-            position: fixed; top: 40px; left: 50%; transform: translateX(-50%);
-            width: 90%; background: rgba(0,0,0,0.8); border: 1px solid #00f2ff;
-            border-radius: 12px; padding: 12px; color: white; text-align: center; z-index: 1001;
-        }
-        .main-dose { font-size: 32px; font-weight: bold; color: #00ff00; }
-        
-        #control-panel {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            width: 90%; background: rgba(20,20,20,0.9); border-radius: 12px;
-            padding: 12px; display: flex; flex-direction: column; gap: 8px; z-index: 1002;
-        }
-        button { padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; color: white; }
-    </style>
+    <title>Camera Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body>
+<body style="margin:0; background:black; color:white; text-align:center;">
+    <h3>카메라 진단 모드</h3>
+    <video id="test-video" autoplay playsinline style="width:100%; max-width:500px; border:2px solid #00f2ff;"></video>
+    <div id="err-msg" style="color:red; margin-top:20px;"></div>
 
-<div id="debug-log"></div>
-<video id="camera-video" autoplay playsinline muted></video>
-
-<div id="ui-header">
-    <div id="status">1. 카메라/센서 허용 필수</div>
-    <div class="main-dose"><span id="dose-rate">0.00</span> mSv/hr</div>
-    <div id="distance">거리: 0.00 m</div>
-</div>
-
-<div id="control-panel">
-    <input type="number" id="base-dose-input" value="10" style="padding:10px; text-align:center;">
-    <button id="btn-init" onclick="initCameraAndSensors()" style="background:#007bff;">1. 카메라 & 센서 켜기</button>
-    <button id="btn-lock" onclick="lockTargetInSpace()" style="background:#28a745; display:none;">2. 현재 위치에 타겟 고정</button>
-    <button onclick="location.reload()" style="background:#444;">초기화</button>
-</div>
-
-<a-scene embedded vr-mode-ui="enabled: false" renderer="alpha: true;">
-    <a-entity id="main-camera" camera look-controls position="0 1.6 0"></a-entity>
-    
-    <a-sphere id="target-marker" radius="0.15" color="red" visible="false"
-              material="emissive: red; emissiveIntensity: 2;"></a-sphere>
-</a-scene>
-
-<script>
-let fixedSourcePos = new THREE.Vector3();
-let baseDoseRate = 0;
-let targetLocked = false;
-
-function logError(msg) {
-    const logEl = document.getElementById('debug-log');
-    logEl.style.display = 'block';
-    logEl.innerText = "Error: " + msg;
-}
-
-// 1. 카메라 및 센서 초기화 (사용자 클릭으로 실행)
-async function initCameraAndSensors() {
-    try {
-        // 카메라 권한 요청
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'environment' }, 
-            audio: false 
-        });
-        document.getElementById('camera-video').srcObject = stream;
-
-        // 센서 권한 요청 (iOS 13+ 필수)
-        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-            const permission = await DeviceOrientationEvent.requestPermission();
-            if (permission !== 'granted') throw new Error("센서 권한이 거부되었습니다.");
+    <script>
+        async function startCamera() {
+            const video = document.getElementById('test-video');
+            const errMsg = document.getElementById('err-msg');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' } 
+                });
+                video.srcObject = stream;
+                console.log("카메라 연결 성공!");
+            } catch (err) {
+                errMsg.innerText = "에러 발생: " + err.name + "\n" + err.message + 
+                                   "\n\n(HTTPS 주소인지, 권한 허용을 눌렀는지 확인하세요!)";
+            }
         }
-
-        document.getElementById('status').innerText = "카메라 활성화됨. 타겟을 지정하세요.";
-        document.getElementById('btn-init').style.display = 'none';
-        document.getElementById('btn-lock').style.display = 'block';
-
-    } catch (err) {
-        logError(err.name + ": " + err.message);
-        alert("카메라를 켤 수 없습니다. HTTPS 환경인지, 권한을 허용했는지 확인하세요.");
-    }
-}
-
-// 2. 타겟 고정 (공간 좌표에 박아버림)
-function lockTargetInSpace() {
-    baseDoseRate = parseFloat(document.getElementById('base-dose-input').value) || 0;
-    const camera = document.getElementById('main-camera').object3D;
-    
-    // 현재 카메라의 위치와 정면 방향(2m 앞)으로 선원 좌표 설정
-    const forward = new THREE.Vector3(0, 0, -2);
-    forward.applyQuaternion(camera.quaternion);
-    fixedSourcePos.copy(camera.position).add(forward);
-
-    const marker = document.getElementById('target-marker');
-    marker.object3D.position.copy(fixedSourcePos);
-    marker.setAttribute('visible', true);
-
-    targetLocked = true;
-    document.getElementById('status').innerText = "타겟 고정됨. 뒤로 물러나 보세요.";
-}
-
-// 3. 거리 계산 루프
-function update() {
-    if (targetLocked) {
-        const camera = document.getElementById('main-camera').object3D;
         
-        // 카메라와 고정된 선원 사이의 거리 측정
-        const dist = camera.position.distanceTo(fixedSourcePos);
-        
-        // 역자승 법칙 적용 (기준거리 0.5m)
-        const d0 = 0.5;
-        const currentDoseRate = baseDoseRate * Math.pow(d0 / Math.max(dist, 0.1), 2);
-
-        document.getElementById('dose-rate').innerText = currentDoseRate.toFixed(2);
-        document.getElementById('distance').innerText = `거리: ${dist.toFixed(2)} m`;
-        document.getElementById('dose-rate').style.color = currentDoseRate > 15 ? "#ff3c3c" : "#00ff00";
-    }
-    requestAnimationFrame(update);
-}
-
-update();
-</script>
+        // 페이지 로드 시 즉시 실행
+        window.onload = startCamera;
+    </script>
 </body>
 </html>
+
+```
+### 💡 해결을 위한 가이드
+ * **컴퓨터에서 개발 중이라면:** VS Code의 Live Server 확장 프로그램을 쓰더라도 localhost가 아니면 카메라가 안 뜹니다. 스마트폰으로 보려면 외부 서버(GitHub 등)에 올리는 게 가장 속 편합니다.
+ * **아이폰이라면:** 설정 -> Safari -> 카메라 -> '허용' 혹은 '묻기'로 되어 있는지 꼭 보세요.
+이 진단 코드를 복사해서 실행했을 때 화면이 나오나요? 만약 여기서도 에러 메시지가 뜬다면 그 메시지를 저한테 알려주세요. 바로 잡아드릴게요! 🧐
