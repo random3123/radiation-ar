@@ -3,238 +3,242 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Radiation Fixed AR Simulator</title>
+    <title>Radiation GPS AR Tracker - Pro</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Inter', sans-serif; touch-action: none; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Inter', sans-serif; }
         .font-orbitron { font-family: 'Orbitron', sans-serif; }
-        #camera-feed { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; opacity: 0.6; }
-        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(8px); border: 1px solid rgba(56, 189, 248, 0.3); }
+        #camera-feed { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; opacity: 0.7; }
+        .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px); border: 1px solid rgba(56, 189, 248, 0.3); }
+        .hazard-glow { text-shadow: 0 0 15px rgba(239, 68, 68, 0.8); }
+        #crosshair { position: fixed; top: 50%; left: 50%; width: 20px; height: 20px; border: 2px solid rgba(56, 189, 248, 0.5); border-radius: 50%; transform: translate(-50%, -50%); z-index: 1000; pointer-events: none; }
         
-        /* 조이스틱 스타일 컨트롤 */
-        .nav-btn {
-            width: 60px; height: 60px; background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2); border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-weight: bold; active:scale-90; transition: all 0.1s;
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
-        .nav-btn:active { background: rgba(56, 189, 248, 0.5); }
+        .critical-pulse { animation: pulse-red 1s infinite; }
     </style>
 </head>
 <body class="text-slate-100">
 
 <video id="camera-feed" autoplay playsinline muted></video>
+<div id="crosshair"></div>
 
-<!-- 상단 HUD: 실시간 선량계 정보 -->
-<div id="ui-header" class="fixed top-4 left-1/2 -translate-x-1/2 w-[92%] max-w-lg glass rounded-2xl p-4 z-[1001]">
+<div id="ui-header" class="fixed top-4 left-1/2 -translate-x-1/2 w-[94%] max-w-lg glass rounded-2xl p-4 z-[1001]">
     <div class="flex justify-between items-center mb-1">
-        <span class="text-[10px] text-sky-400 font-bold tracking-widest uppercase">Radiation Dosimeter v3.0</span>
-        <div id="status-light" class="w-2 h-2 rounded-full bg-slate-500"></div>
+        <span class="text-[10px] text-sky-400 font-bold tracking-widest uppercase">GPS Dosimeter Simulator v5.0</span>
+        <div id="gps-status" class="flex items-center gap-1.5">
+            <span id="accuracy-text" class="text-[9px] text-slate-400">GPS Waiting...</span>
+            <div id="status-light" class="w-2 h-2 rounded-full bg-slate-500"></div>
+        </div>
     </div>
     
-    <div class="text-center py-2">
-        <div class="text-[11px] text-slate-400 uppercase">Current Dose Rate</div>
-        <div id="dose-display" class="font-orbitron text-5xl font-bold text-green-400 transition-colors">0.00 <span class="text-lg">mSv/h</span></div>
+    <div class="text-center py-1">
+        <div class="text-[11px] text-slate-400 uppercase mb-1">Current Dose Rate</div>
+        <div id="dose-display" class="font-orbitron text-5xl font-bold text-green-400 transition-all">0.00 <span class="text-lg font-normal">mSv/h</span></div>
     </div>
 
-    <div class="grid grid-cols-2 gap-2 mt-2 border-t border-slate-700 pt-3">
+    <div class="grid grid-cols-2 gap-4 mt-3 border-t border-slate-700 pt-3">
         <div class="text-center">
-            <div class="text-[9px] text-slate-500 uppercase">Distance to Source</div>
-            <div id="dist-text" class="font-orbitron text-xl">--- m</div>
+            <div class="text-[9px] text-slate-500 uppercase">Distance (GPS)</div>
+            <div id="dist-text" class="font-orbitron text-xl text-sky-300">0.00 m</div>
         </div>
         <div class="text-center border-l border-slate-700">
-            <div class="text-[9px] text-slate-500 uppercase">Cumulative Dose</div>
-            <div id="cum-text" class="font-orbitron text-xl text-sky-300">0.0000</div>
+            <div class="text-[9px] text-slate-500 uppercase">Cumulative Exposure</div>
+            <div id="cum-text" class="font-orbitron text-xl text-amber-400">0.000000</div>
         </div>
     </div>
 </div>
 
-<!-- 하단 컨트롤 패널 -->
-<div id="control-panel" class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-lg z-[1002] flex flex-col gap-4">
-    
-    <!-- 이동 컨트롤러 (중요: 거리를 강제로 변화시킴) -->
-    <div class="flex justify-between items-end">
-        <div class="flex flex-col items-center gap-2">
-            <div class="text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-tighter text-center">Simulated Movement<br>(Walk with these)</div>
-            <div class="grid grid-cols-3 gap-2">
-                <div></div>
-                <button onmousedown="move('forward')" ontouchstart="move('forward')" onmouseup="stopMove()" ontouchend="stopMove()" class="nav-btn">▲</button>
-                <div></div>
-                <button onmousedown="move('left')" ontouchstart="move('left')" onmouseup="stopMove()" ontouchend="stopMove()" class="nav-btn">◀</button>
-                <button onmousedown="move('backward')" ontouchstart="move('backward')" onmouseup="stopMove()" ontouchend="stopMove()" class="nav-btn">▼</button>
-                <button onmousedown="move('right')" ontouchstart="move('right')" onmouseup="stopMove()" ontouchend="stopMove()" class="nav-btn">▶</button>
+<div id="control-panel" class="fixed bottom-8 left-1/2 -translate-x-1/2 w-[94%] max-w-lg z-[1002] flex flex-col gap-3">
+    <div class="glass p-4 rounded-2xl shadow-2xl">
+        <div class="flex flex-col gap-3">
+            <div>
+                <label class="text-[10px] text-slate-400 uppercase font-bold ml-1">Source Intensity (at 1m)</label>
+                <div class="relative mt-1">
+                    <input type="number" id="base-dose-input" value="50" class="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 px-4 text-white text-xl font-orbitron focus:ring-2 focus:ring-sky-500 outline-none">
+                    <span class="absolute right-4 top-3.5 text-slate-500 font-bold">mSv/h</span>
+                </div>
             </div>
-        </div>
+            
+            <div class="grid grid-cols-2 gap-3">
+                <button id="sensor-btn" onclick="initSensors()" class="bg-slate-800 hover:bg-slate-700 py-4 rounded-xl font-bold flex flex-col items-center justify-center border border-slate-600 transition-all active:scale-95">
+                    <span class="text-[10px] text-sky-400 uppercase">Step 1</span>
+                    <span>Enable Sensors</span>
+                </button>
+                <button id="deploy-btn" onclick="deployTarget()" disabled class="bg-sky-600 opacity-50 hover:bg-sky-500 py-4 rounded-xl font-bold flex flex-col items-center justify-center shadow-lg transition-all active:scale-95">
+                    <span class="text-[10px] text-white/70 uppercase">Step 2</span>
+                    <span>Deploy Source</span>
+                </button>
+            </div>
 
-        <div class="flex flex-col gap-2 w-1/2">
-            <div class="glass p-3 rounded-xl">
-                <label class="text-[10px] text-slate-400 uppercase">Target Intensity (at 1m)</label>
-                <input type="number" id="base-dose-input" value="50" class="w-full bg-transparent text-xl font-orbitron border-b border-sky-500 focus:outline-none py-1">
-            </div>
-            <button onclick="lockTarget()" class="w-full bg-sky-600 hover:bg-sky-500 py-4 rounded-xl font-bold shadow-lg transition-transform active:scale-95">
-                TARGET DEPLOY
+            <button onclick="resetSystem()" class="w-full bg-rose-900/40 hover:bg-rose-800/60 border border-rose-500/50 py-3 rounded-xl font-bold text-rose-200 transition-all active:scale-95 flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                SYSTEM RESET
             </button>
         </div>
     </div>
-    
-    <div class="flex justify-center gap-4">
-        <button onclick="startCamera()" class="text-xs text-sky-400 border border-sky-900 px-3 py-1 rounded-full bg-sky-900/20">Enable Sensors</button>
-        <button onclick="location.reload()" class="text-xs text-slate-500 underline">Reset System</button>
-    </div>
 </div>
 
-<!-- 3D AR Scene -->
 <a-scene embedded vr-mode-ui="enabled: false" renderer="alpha: true; antialias: true;">
-    <!-- 카메라: position이 수동으로 제어됨 -->
-    <a-entity id="rig" position="0 1.6 0">
-        <a-camera id="main-camera" look-controls="pointerLockEnabled: false"></a-camera>
-    </a-entity>
+    <a-camera id="main-camera" position="0 1.6 0" look-controls="pointerLockEnabled: false"></a-camera>
 
-    <!-- 방사선원 (빨간 구) -->
     <a-entity id="radiation-source" visible="false">
-        <a-sphere radius="0.2" color="#ff0000" material="emissive: #ff0000; emissiveIntensity: 3;">
-            <!-- 맥동 애니메이션 -->
-            <a-animation attribute="scale" from="1 1 1" to="1.3 1.3 1.3" dur="1000" direction="alternate" repeat="indefinite"></a-animation>
+        <a-sphere radius="0.3" color="#ff0000" material="emissive: #ff0000; emissiveIntensity: 3;">
+            <a-animation attribute="scale" from="1 1 1" to="1.3 1.3 1.3" dur="800" direction="alternate" repeat="indefinite"></a-animation>
         </a-sphere>
-        <!-- 범위 가이드 -->
-        <a-ring radius-inner="0.98" radius-outer="1.0" rotation="-90 0 0" color="#ff0000" opacity="0.5"></a-ring>
-        <a-text id="source-tag" value="SOURCE" align="center" position="0 0.4 0" scale="1.5 1.5 1.5"></a-text>
+        <a-ring radius-inner="0.6" radius-outer="0.65" rotation="-90 0 0" color="#ff0000" opacity="0.6"></a-ring>
+        <a-text value="DANGER: SOURCE" align="center" position="0 0.7 0" scale="1.5 1.5 1.5" font="monoid"></a-text>
     </a-entity>
 </a-scene>
 
 <script>
-let fixedSourcePos = new THREE.Vector3();
-let baseDoseAt1m = 50; 
+let targetGps = null;
+let currentGps = null;
+let baseDoseAt1m = 50;
 let targetLocked = false;
 let cumulativeDose = 0;
 let lastFrameTime = performance.now();
-let moveDirection = { x: 0, z: 0 };
-let moveSpeed = 0.05;
+let watchId = null;
 
-// 가이거 계수기 사운드
 const synth = new Tone.NoiseSynth({
     noise: { type: 'white' },
-    envelope: { attack: 0.001, decay: 0.01, sustain: 0 }
+    envelope: { attack: 0.001, decay: 0.015, sustain: 0 }
 }).toDestination();
 
-async function startCamera() {
+function getDistanceInMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371e3;
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+async function initSensors() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'environment' }, 
-            audio: false 
-        });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         document.getElementById('camera-feed').srcObject = stream;
         await Tone.start();
-        document.getElementById('status-light').classList.replace('bg-slate-500', 'bg-green-500');
-        showToast("Sensors active. Look around and deploy.");
+
+        if ("geolocation" in navigator) {
+            if(watchId) navigator.geolocation.clearWatch(watchId);
+            watchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    currentGps = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+                    document.getElementById('accuracy-text').innerText = `Acc: ±${pos.coords.accuracy.toFixed(1)}m`;
+                    document.getElementById('status-light').className = "w-2 h-2 rounded-full bg-green-500";
+                    document.getElementById('deploy-btn').disabled = false;
+                    document.getElementById('deploy-btn').style.opacity = "1";
+                },
+                (err) => showToast("GPS Error: " + err.message),
+                { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+            );
+            showToast("Sensors Initialized");
+        }
     } catch (err) {
-        showToast("Camera access denied.");
+        showToast("Permission Denied");
     }
 }
 
-function lockTarget() {
+function deployTarget() {
+    if (!currentGps) {
+        showToast("Waiting for GPS signal...");
+        return;
+    }
+
     const camera = document.getElementById('main-camera').object3D;
-    const rig = document.getElementById('rig').object3D;
-    
-    // 현재 리그(사용자 위치) 기준으로 카메라 정면 3m 지점 계산
-    const direction = new THREE.Vector3(0, 0, -3);
-    direction.applyQuaternion(camera.quaternion);
-    
-    // 절대 좌표(World Space)로 변환하여 저장
-    fixedSourcePos.copy(rig.position).add(direction);
-    
     const sourceEl = document.getElementById('radiation-source');
-    sourceEl.object3D.position.copy(fixedSourcePos);
-    sourceEl.setAttribute('visible', 'true');
     
+    targetGps = { ...currentGps };
     baseDoseAt1m = parseFloat(document.getElementById('base-dose-input').value) || 50;
+
+    const forward = new THREE.Vector3(0, 0, -3);
+    forward.applyQuaternion(camera.quaternion);
+    sourceEl.object3D.position.copy(camera.position).add(forward);
+    
+    sourceEl.setAttribute('visible', 'true');
     targetLocked = true;
     cumulativeDose = 0;
     
     document.getElementById('status-light').classList.add('animate-pulse');
-    showToast("Target Fixed in Space!");
+    showToast("Source Fixed at Coordinates");
 }
 
-function move(dir) {
-    const camera = document.getElementById('main-camera').object3D;
-    // 카메라가 바라보는 방향 기준 벡터
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-    forward.y = 0; // 수평 이동만
-    forward.normalize();
-    const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), forward).negate();
-
-    if(dir === 'forward') moveDirection = { x: forward.x, z: forward.z };
-    if(dir === 'backward') moveDirection = { x: -forward.x, z: -forward.z };
-    if(dir === 'left') moveDirection = { x: -right.x, z: -right.z };
-    if(dir === 'right') moveDirection = { x: right.x, z: right.z };
-}
-
-function stopMove() {
-    moveDirection = { x: 0, z: 0 };
+function resetSystem() {
+    // 1. 상태 변수 초기화
+    targetLocked = false;
+    targetGps = null;
+    cumulativeDose = 0;
+    
+    // 2. UI 초기화
+    document.getElementById('dose-display').innerHTML = `0.00 <span class="text-lg font-normal">mSv/h</span>`;
+    document.getElementById('dose-display').className = "font-orbitron text-5xl font-bold text-green-400 transition-all";
+    document.getElementById('dist-text').innerText = "0.00 m";
+    document.getElementById('cum-text').innerText = "0.000000";
+    document.getElementById('status-light').classList.remove('animate-pulse');
+    
+    // 3. 3D 오브젝트 숨기기
+    document.getElementById('radiation-source').setAttribute('visible', 'false');
+    
+    showToast("System Reset Complete");
+    
+    // 페이지를 새로고침하여 센서 및 메모리 완전히 비우고 싶다면 아래 주석 해제
+    // location.reload();
 }
 
 let nextTickTime = 0;
 function update() {
     const now = performance.now();
-    const dt = (now - lastFrameTime) / 1000;
-    const dtHours = dt / 3600;
+    const dtHours = (now - lastFrameTime) / 3600000;
     lastFrameTime = now;
 
-    const rig = document.getElementById('rig').object3D;
-    const camera = document.getElementById('main-camera').object3D;
+    if (targetLocked && currentGps && targetGps) {
+        let dist = getDistanceInMeters(currentGps.lat, currentGps.lon, targetGps.lat, targetGps.lon);
+        dist = Math.max(0.5, dist);
 
-    // 1. 이동 처리 (물리적 이동 대신 가상 이동)
-    rig.position.x += moveDirection.x * moveSpeed;
-    rig.position.z += moveDirection.z * moveSpeed;
-
-    if (targetLocked) {
-        // 2. 거리 계산 (사용자 Rig와 고정된 Source 사이)
-        let dist = rig.position.distanceTo(fixedSourcePos);
-        dist = Math.max(0.3, dist); // 너무 가까워 수치가 무한대가 되는 것 방지
-
-        // 3. 역자승 법칙 적용 (I2 = I1 * (d1/d2)^2)
-        // 기준: d1 = 1m
         const currentDoseRate = baseDoseAt1m * Math.pow(1 / dist, 2);
         cumulativeDose += currentDoseRate * dtHours;
 
-        // 4. UI 및 시각 효과 업데이트
         const doseDisp = document.getElementById('dose-display');
         document.getElementById('dist-text').innerText = `${dist.toFixed(2)} m`;
         document.getElementById('cum-text').innerText = cumulativeDose.toFixed(6);
-        doseDisp.innerHTML = `${currentDoseRate.toFixed(2)} <span class="text-lg">mSv/h</span>`;
+        doseDisp.innerHTML = `${currentDoseRate.toFixed(2)} <span class="text-lg font-normal">mSv/h</span>`;
 
-        // 선량에 따른 색상/사운드 강도 조절
         if (currentDoseRate > 100) {
-            doseDisp.className = "font-orbitron text-5xl font-bold text-red-500 animate-bounce";
+            doseDisp.className = "font-orbitron text-5xl font-bold text-red-500 hazard-glow animate-pulse";
         } else if (currentDoseRate > 20) {
             doseDisp.className = "font-orbitron text-5xl font-bold text-yellow-400";
         } else {
             doseDisp.className = "font-orbitron text-5xl font-bold text-green-400";
         }
 
-        // 가이거 클릭 소리
-        const tickInterval = Math.max(20, 1000 / (currentDoseRate * 0.5 + 1));
+        const tickInterval = Math.max(15, 1000 / (currentDoseRate * 0.4 + 1));
         if (now > nextTickTime) {
             synth.triggerAttackRelease("16n");
             nextTickTime = now + tickInterval;
         }
 
-        // 소스 텍스트가 항상 카메라를 보게 함
-        document.getElementById('radiation-source').object3D.lookAt(rig.position);
+        const sourceEl = document.getElementById('radiation-source');
+        sourceEl.object3D.lookAt(document.getElementById('main-camera').object3D.position);
     }
-
     requestAnimationFrame(update);
 }
 
 function showToast(m) {
     const t = document.createElement('div');
-    t.className = "fixed top-1/2 left-1/2 -translate-x-1/2 bg-sky-900/90 text-white px-6 py-3 rounded-full z-[3000] border border-sky-400 text-sm font-bold";
+    t.className = "fixed bottom-44 left-1/2 -translate-x-1/2 bg-sky-950/90 text-white px-5 py-2.5 rounded-full z-[3000] border border-sky-500 text-xs font-bold shadow-2xl";
     t.innerText = m;
     document.body.appendChild(t);
-    setTimeout(() => t.remove(), 2000);
+    setTimeout(() => t.remove(), 2500);
 }
 
 window.onload = () => update();
