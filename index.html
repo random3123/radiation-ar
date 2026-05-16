@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Radiation GPS AR Tracker - Pro</title>
+    <title>Radiation AR - Touch & Track</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
@@ -14,38 +14,39 @@
         #camera-feed { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; opacity: 0.7; }
         .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px); border: 1px solid rgba(56, 189, 248, 0.3); }
         .hazard-glow { text-shadow: 0 0 15px rgba(239, 68, 68, 0.8); }
-        #crosshair { position: fixed; top: 50%; left: 50%; width: 20px; height: 20px; border: 2px solid rgba(56, 189, 248, 0.5); border-radius: 50%; transform: translate(-50%, -50%); z-index: 1000; pointer-events: none; }
+        
+        /* 터치 유도 레이어 */
+        #touch-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; cursor: crosshair; }
         
         @keyframes pulse-red {
             0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
             70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
             100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
-        .critical-pulse { animation: pulse-red 1s infinite; }
     </style>
 </head>
 <body class="text-slate-100">
 
 <video id="camera-feed" autoplay playsinline muted></video>
-<div id="crosshair"></div>
 
-<div id="ui-header" class="fixed top-4 left-1/2 -translate-x-1/2 w-[94%] max-w-lg glass rounded-2xl p-4 z-[1001]">
+<!-- 메인 HUD -->
+<div id="ui-header" class="fixed top-4 left-1/2 -translate-x-1/2 w-[94%] max-w-lg glass rounded-2xl p-4 z-[1001] pointer-events-none">
     <div class="flex justify-between items-center mb-1">
-        <span class="text-[10px] text-sky-400 font-bold tracking-widest uppercase">GPS Dosimeter Simulator v5.0</span>
+        <span class="text-[10px] text-sky-400 font-bold tracking-widest uppercase">Radiation Touch Tracker v6.0</span>
         <div id="gps-status" class="flex items-center gap-1.5">
-            <span id="accuracy-text" class="text-[9px] text-slate-400">GPS Waiting...</span>
+            <span id="accuracy-text" class="text-[9px] text-slate-400">GPS Initializing...</span>
             <div id="status-light" class="w-2 h-2 rounded-full bg-slate-500"></div>
         </div>
     </div>
     
     <div class="text-center py-1">
-        <div class="text-[11px] text-slate-400 uppercase mb-1">Current Dose Rate</div>
-        <div id="dose-display" class="font-orbitron text-5xl font-bold text-green-400 transition-all">0.00 <span class="text-lg font-normal">mSv/h</span></div>
+        <div id="instruction" class="text-[11px] text-amber-400 uppercase mb-1 animate-pulse">화면 속 사물을 터치하여 소스를 배치하세요</div>
+        <div id="dose-display" class="font-orbitron text-5xl font-bold text-green-400">0.00 <span class="text-lg font-normal">mSv/h</span></div>
     </div>
 
     <div class="grid grid-cols-2 gap-4 mt-3 border-t border-slate-700 pt-3">
         <div class="text-center">
-            <div class="text-[9px] text-slate-500 uppercase">Distance (GPS)</div>
+            <div class="text-[9px] text-slate-500 uppercase">Distance (Actual)</div>
             <div id="dist-text" class="font-orbitron text-xl text-sky-300">0.00 m</div>
         </div>
         <div class="text-center border-l border-slate-700">
@@ -55,6 +56,7 @@
     </div>
 </div>
 
+<!-- 하단 컨트롤 패널 -->
 <div id="control-panel" class="fixed bottom-8 left-1/2 -translate-x-1/2 w-[94%] max-w-lg z-[1002] flex flex-col gap-3">
     <div class="glass p-4 rounded-2xl shadow-2xl">
         <div class="flex flex-col gap-3">
@@ -67,35 +69,36 @@
             </div>
             
             <div class="grid grid-cols-2 gap-3">
-                <button id="sensor-btn" onclick="initSensors()" class="bg-slate-800 hover:bg-slate-700 py-4 rounded-xl font-bold flex flex-col items-center justify-center border border-slate-600 transition-all active:scale-95">
+                <button onclick="initSensors()" class="bg-slate-800 hover:bg-slate-700 py-4 rounded-xl font-bold flex flex-col items-center justify-center border border-slate-600 transition-all active:scale-95">
                     <span class="text-[10px] text-sky-400 uppercase">Step 1</span>
                     <span>Enable Sensors</span>
                 </button>
-                <button id="deploy-btn" onclick="deployTarget()" disabled class="bg-sky-600 opacity-50 hover:bg-sky-500 py-4 rounded-xl font-bold flex flex-col items-center justify-center shadow-lg transition-all active:scale-95">
-                    <span class="text-[10px] text-white/70 uppercase">Step 2</span>
-                    <span>Deploy Source</span>
+                <button onclick="resetSystem()" class="bg-rose-900/40 hover:bg-rose-800/60 border border-rose-500/50 py-4 rounded-xl font-bold text-rose-200 transition-all active:scale-95 flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    RESET
                 </button>
             </div>
-
-            <button onclick="resetSystem()" class="w-full bg-rose-900/40 hover:bg-rose-800/60 border border-rose-500/50 py-3 rounded-xl font-bold text-rose-200 transition-all active:scale-95 flex items-center justify-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                SYSTEM RESET
-            </button>
         </div>
     </div>
 </div>
 
-<a-scene embedded vr-mode-ui="enabled: false" renderer="alpha: true; antialias: true;">
+<a-scene embedded vr-mode-ui="enabled: false" renderer="alpha: true; antialias: true;" cursor="rayOrigin: mouse" raycaster="objects: .collidable">
+    <!-- 가상 바닥 (터치 인식을 위해) -->
+    <a-plane class="collidable" position="0 0 0" rotation="-90 0 0" width="100" height="100" visible="false"></a-plane>
+    
     <a-camera id="main-camera" position="0 1.6 0" look-controls="pointerLockEnabled: false"></a-camera>
 
     <a-entity id="radiation-source" visible="false">
-        <a-sphere radius="0.3" color="#ff0000" material="emissive: #ff0000; emissiveIntensity: 3;">
-            <a-animation attribute="scale" from="1 1 1" to="1.3 1.3 1.3" dur="800" direction="alternate" repeat="indefinite"></a-animation>
+        <a-sphere radius="0.25" color="#ff0000" material="emissive: #ff0000; emissiveIntensity: 3;">
+            <a-animation attribute="scale" from="1 1 1" to="1.4 1.4 1.4" dur="600" direction="alternate" repeat="indefinite"></a-animation>
         </a-sphere>
-        <a-ring radius-inner="0.6" radius-outer="0.65" rotation="-90 0 0" color="#ff0000" opacity="0.6"></a-ring>
-        <a-text value="DANGER: SOURCE" align="center" position="0 0.7 0" scale="1.5 1.5 1.5" font="monoid"></a-text>
+        <a-ring radius-inner="0.6" radius-outer="0.65" rotation="-90 0 0" color="#ff0000" opacity="0.6">
+             <a-animation attribute="scale" from="0.5 0.5 0.5" to="5 5 5" dur="1500" repeat="indefinite" easing="linear"></a-animation>
+             <a-animation attribute="material.opacity" from="0.6" to="0" dur="1500" repeat="indefinite" easing="linear"></a-animation>
+        </a-ring>
+        <a-text value="RADIATION SOURCE" align="center" position="0 0.8 0" scale="1.5 1.5 1.5" color="#ff3333"></a-text>
     </a-entity>
 </a-scene>
 
@@ -114,7 +117,7 @@ const synth = new Tone.NoiseSynth({
 }).toDestination();
 
 function getDistanceInMeters(lat1, lon1, lat2, lon2) {
-    const R = 6371e3;
+    const R = 6371e3; // 지구 반지름 (m)
     const φ1 = lat1 * Math.PI / 180;
     const φ2 = lat2 * Math.PI / 180;
     const Δφ = (lat2 - lat1) * Math.PI / 180;
@@ -130,69 +133,71 @@ async function initSensors() {
         await Tone.start();
 
         if ("geolocation" in navigator) {
-            if(watchId) navigator.geolocation.clearWatch(watchId);
             watchId = navigator.geolocation.watchPosition(
                 (pos) => {
                     currentGps = { lat: pos.coords.latitude, lon: pos.coords.longitude };
                     document.getElementById('accuracy-text').innerText = `Acc: ±${pos.coords.accuracy.toFixed(1)}m`;
                     document.getElementById('status-light').className = "w-2 h-2 rounded-full bg-green-500";
-                    document.getElementById('deploy-btn').disabled = false;
-                    document.getElementById('deploy-btn').style.opacity = "1";
                 },
                 (err) => showToast("GPS Error: " + err.message),
                 { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
             );
-            showToast("Sensors Initialized");
+            showToast("Sensors Active. Touch an object to place source.");
         }
     } catch (err) {
-        showToast("Permission Denied");
+        showToast("Camera Permission Denied");
     }
 }
 
-function deployTarget() {
+// A-Frame Scene에 클릭(터치) 이벤트 리스너 추가
+document.querySelector('a-scene').addEventListener('click', function (evt) {
     if (!currentGps) {
         showToast("Waiting for GPS signal...");
         return;
     }
 
-    const camera = document.getElementById('main-camera').object3D;
-    const sourceEl = document.getElementById('radiation-source');
+    // 클릭한 지점의 월드 좌표 가져오기 (레이캐스팅 결과)
+    const touchPoint = evt.detail.intersection ? evt.detail.intersection.point : null;
     
-    targetGps = { ...currentGps };
-    baseDoseAt1m = parseFloat(document.getElementById('base-dose-input').value) || 50;
+    if (touchPoint) {
+        const sourceEl = document.getElementById('radiation-source');
+        sourceEl.object3D.position.copy(touchPoint);
+        sourceEl.setAttribute('visible', 'true');
 
-    const forward = new THREE.Vector3(0, 0, -3);
-    forward.applyQuaternion(camera.quaternion);
-    sourceEl.object3D.position.copy(camera.position).add(forward);
-    
-    sourceEl.setAttribute('visible', 'true');
-    targetLocked = true;
-    cumulativeDose = 0;
-    
-    document.getElementById('status-light').classList.add('animate-pulse');
-    showToast("Source Fixed at Coordinates");
-}
+        // GPS 좌표 변환 로직 (간단한 평면 근사치 사용)
+        // 위도 1도당 약 111,320m, 경도 1도당 약 111,320m * cos(lat)
+        const latOffset = touchPoint.z / 111320;
+        const lonOffset = touchPoint.x / (111320 * Math.cos(currentGps.lat * Math.PI / 180));
+        
+        targetGps = {
+            lat: currentGps.lat - latOffset,
+            lon: currentGps.lon + lonOffset
+        };
+
+        baseDoseAt1m = parseFloat(document.getElementById('base-dose-input').value) || 50;
+        targetLocked = true;
+        cumulativeDose = 0;
+        
+        document.getElementById('instruction').innerText = "소스가 배치되었습니다. 거리를 조절하며 측정하세요.";
+        document.getElementById('instruction').className = "text-[11px] text-sky-400 uppercase mb-1";
+        showToast("Source Fixed at Touched Location");
+    }
+});
 
 function resetSystem() {
-    // 1. 상태 변수 초기화
     targetLocked = false;
     targetGps = null;
     cumulativeDose = 0;
     
-    // 2. UI 초기화
     document.getElementById('dose-display').innerHTML = `0.00 <span class="text-lg font-normal">mSv/h</span>`;
-    document.getElementById('dose-display').className = "font-orbitron text-5xl font-bold text-green-400 transition-all";
+    document.getElementById('dose-display').className = "font-orbitron text-5xl font-bold text-green-400";
     document.getElementById('dist-text').innerText = "0.00 m";
     document.getElementById('cum-text').innerText = "0.000000";
-    document.getElementById('status-light').classList.remove('animate-pulse');
+    document.getElementById('instruction').innerText = "화면 속 사물을 터치하여 소스를 배치하세요";
+    document.getElementById('instruction').className = "text-[11px] text-amber-400 uppercase mb-1 animate-pulse";
     
-    // 3. 3D 오브젝트 숨기기
     document.getElementById('radiation-source').setAttribute('visible', 'false');
-    
     showToast("System Reset Complete");
-    
-    // 페이지를 새로고침하여 센서 및 메모리 완전히 비우고 싶다면 아래 주석 해제
-    // location.reload();
 }
 
 let nextTickTime = 0;
@@ -203,8 +208,11 @@ function update() {
 
     if (targetLocked && currentGps && targetGps) {
         let dist = getDistanceInMeters(currentGps.lat, currentGps.lon, targetGps.lat, targetGps.lon);
+        
+        // 최소 거리 보정 (0.5m 미만은 0.5m로 계산하여 수치 폭발 방지)
         dist = Math.max(0.5, dist);
 
+        // 역자승 법칙 적용
         const currentDoseRate = baseDoseAt1m * Math.pow(1 / dist, 2);
         cumulativeDose += currentDoseRate * dtHours;
 
@@ -213,6 +221,7 @@ function update() {
         document.getElementById('cum-text').innerText = cumulativeDose.toFixed(6);
         doseDisp.innerHTML = `${currentDoseRate.toFixed(2)} <span class="text-lg font-normal">mSv/h</span>`;
 
+        // 선량에 따른 UI 시각화
         if (currentDoseRate > 100) {
             doseDisp.className = "font-orbitron text-5xl font-bold text-red-500 hazard-glow animate-pulse";
         } else if (currentDoseRate > 20) {
@@ -221,12 +230,14 @@ function update() {
             doseDisp.className = "font-orbitron text-5xl font-bold text-green-400";
         }
 
+        // 가이거 계수기 소리 (선량에 비례하여 틱 간격 조절)
         const tickInterval = Math.max(15, 1000 / (currentDoseRate * 0.4 + 1));
         if (now > nextTickTime) {
             synth.triggerAttackRelease("16n");
             nextTickTime = now + tickInterval;
         }
 
+        // 소스 텍스트가 항상 카메라를 향하게 함
         const sourceEl = document.getElementById('radiation-source');
         sourceEl.object3D.lookAt(document.getElementById('main-camera').object3D.position);
     }
@@ -235,10 +246,13 @@ function update() {
 
 function showToast(m) {
     const t = document.createElement('div');
-    t.className = "fixed bottom-44 left-1/2 -translate-x-1/2 bg-sky-950/90 text-white px-5 py-2.5 rounded-full z-[3000] border border-sky-500 text-xs font-bold shadow-2xl";
+    t.className = "fixed bottom-44 left-1/2 -translate-x-1/2 bg-sky-950/90 text-white px-5 py-2.5 rounded-full z-[3000] border border-sky-500 text-xs font-bold shadow-2xl transition-all";
     t.innerText = m;
     document.body.appendChild(t);
-    setTimeout(() => t.remove(), 2500);
+    setTimeout(() => {
+        t.style.opacity = '0';
+        setTimeout(() => t.remove(), 500);
+    }, 2500);
 }
 
 window.onload = () => update();
