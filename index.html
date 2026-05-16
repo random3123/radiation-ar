@@ -86,11 +86,13 @@
     </a-entity>
 
     <a-entity id="radiation-source" visible="false">
-        <a-sphere radius="0.2" color="#ff0000" material="emissive: #ff0000; emissiveIntensity: 4;">
+        <a-sphere radius="0.08" color="#ff0000" material="emissive: #ff0000; emissiveIntensity: 4;">
             <a-animation attribute="scale" from="1 1 1" to="1.2 1.2 1.2" dur="500" direction="alternate" repeat="indefinite"></a-animation>
         </a-sphere>
+        <!-- 빨간 구체 위 실시간 텍스트 라벨 추가 -->
+        <a-text id="source-label" value="0 mSv/h" align="center" position="0 0.2 0" color="#ff4444" scale="0.4 0.4 0.4"></a-text>
         <!-- 범위 가이드 고리 -->
-        <a-ring radius-inner="0.3" radius-outer="0.32" rotation="-90 0 0" color="#ff0000" opacity="0.8">
+        <a-ring radius-inner="0.12" radius-outer="0.15" rotation="-90 0 0" color="#ff0000" opacity="0.8">
              <a-animation attribute="scale" from="1 1 1" to="8 8 8" dur="2000" repeat="indefinite" easing="linear"></a-animation>
              <a-animation attribute="material.opacity" from="0.8" to="0" dur="2000" repeat="indefinite" easing="linear"></a-animation>
         </a-ring>
@@ -191,8 +193,8 @@ function handlePlaceSource() {
     const camera = document.getElementById('main-camera').object3D;
     const sourceEl = document.getElementById('radiation-source');
 
-    // 카메라 정면 3m 지점에 소스 생성
-    const forward = new THREE.Vector3(0, 0, -3);
+    // 카메라 정면 0.5m 지점에 소스 생성 (수정됨)
+    const forward = new THREE.Vector3(0, 0, -0.5);
     forward.applyQuaternion(camera.quaternion);
     
     // 절대 좌표 저장
@@ -207,7 +209,7 @@ function handlePlaceSource() {
 
     document.getElementById('instruction').innerText = "소스 배치 완료. 이제 실습실 안을 걸어보세요.";
     document.getElementById('instruction').className = "text-[11px] text-sky-400 font-bold mb-1";
-    showToast("방사선원 배치됨: 거리 증폭 모드 작동 중");
+    showToast("전방 50cm 거리에 방사선원 배치됨");
 }
 
 function resetSystem() {
@@ -236,11 +238,14 @@ function update() {
         
         // 현재 위치와 소스 위치 간의 거리 계산
         let dist = rig.position.distanceTo(fixedSourcePos);
-        dist = Math.max(0.4, dist); // 너무 가까워 수치가 폭발하는 것 방지
+        dist = Math.max(0.1, dist); // 너무 가까워 수치가 폭발하는 것 방지 (0.1m로 완화)
 
-        // 역자승 법칙 적용 (증폭된 거리 기준)
-        const currentDoseRate = baseDoseAt1m * Math.pow(1 / dist, 2);
+        // 역자승 법칙 적용 (입력된 선량을 0.5m 지점의 기준 선량으로 취급)
+        const currentDoseRate = baseDoseAt1m * Math.pow(0.5 / dist, 2);
         cumulativeDose += currentDoseRate * dtHours;
+
+        // 3D 구체 위에 실시간 선량 표시 업데이트
+        document.getElementById('source-label').setAttribute('value', `SOURCE: ${baseDoseAt1m} mSv/h\nCURRENT: ${currentDoseRate.toFixed(1)} mSv/h`);
 
         // UI 업데이트
         const doseDisp = document.getElementById('dose-display');
