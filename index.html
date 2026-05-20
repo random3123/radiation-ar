@@ -30,22 +30,14 @@
     <h1 class="text-3xl font-orbitron font-bold text-white mb-2 text-center">AR 방사선 실습계측기</h1>
     <p class="text-sky-400 font-bold mb-6 text-center text-sm">도보/가상 이동 + 차폐 시뮬레이션</p>
     
-    <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 mb-8 max-w-sm text-center shadow-xl w-full">
-        
-        <!-- [신규] 방사선 종류 선택 -->
-        <label class="text-[11px] text-slate-400 uppercase font-bold block mb-2">실습 방사선 종류</label>
-        <select id="radiation-type" class="w-full bg-slate-900 border border-slate-600 rounded-lg py-2 px-2 text-white text-center font-bold mb-4 focus:border-sky-500 outline-none">
-            <option value="alpha">알파선 (α)</option>
-            <option value="beta">베타선 (β)</option>
-            <option value="gamma">감마선 (γ)</option>
-        </select>
-
-        <label class="text-[11px] text-slate-400 uppercase font-bold block mb-2">실습 기준 선량 (1m 거리 기준)</label>
+    <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 mb-8 max-w-sm text-center shadow-xl w-full">
+        <!-- 방사선 종류 선택은 AR 화면 안으로 이동하고, 선량 크기만 입력받음 -->
+        <label class="text-[12px] text-slate-400 uppercase font-bold block mb-3">실습 기준 선량 (1m 거리 기준)</label>
         <div class="flex items-center justify-center gap-2">
-            <input type="number" id="base-dose-input" value="100" class="w-24 bg-slate-900 border border-slate-600 rounded-lg py-2 px-2 text-white text-center font-orbitron text-xl focus:border-sky-500 outline-none">
+            <input type="number" id="base-dose-input" value="100" class="w-28 bg-slate-900 border border-slate-600 rounded-lg py-3 px-2 text-white text-center font-orbitron text-2xl focus:border-sky-500 outline-none">
             <span class="text-slate-400 font-bold">mSv/h</span>
         </div>
-        <p class="text-slate-400 text-[10px] mt-3">선원은 스마트폰 정면 <span class="text-amber-400 font-bold">3m 앞</span>에 생성됩니다.</p>
+        <p class="text-slate-400 text-[10px] mt-4">선원은 스마트폰 정면 <span class="text-amber-400 font-bold">3m 앞</span>에 생성됩니다.</p>
     </div>
 
     <button id="start-ar-btn" class="bg-green-600 hover:bg-green-500 px-8 py-4 rounded-2xl font-bold text-lg shadow-[0_0_20px_rgba(22,163,74,0.5)] transition-all active:scale-95 w-full max-w-sm text-white">
@@ -62,7 +54,6 @@
     <div class="absolute top-4 left-1/2 -translate-x-1/2 w-[94%] max-w-lg glass rounded-2xl p-4">
         <div class="flex justify-between items-center mb-1">
             <span id="status-msg" class="text-[12px] text-amber-400 font-bold animate-pulse">원하는 위치를 조준하고 배치하세요</span>
-            <span id="rad-type-badge" class="text-[10px] bg-red-600 px-2 py-1 rounded text-white font-bold uppercase"></span>
         </div>
         
         <div class="text-center py-1">
@@ -95,19 +86,28 @@
         </div>
     </div>
 
-    <!-- 하단 컨트롤 버튼 (배치 + 차폐) -->
+    <!-- 하단 컨트롤 버튼 (배치 + 차폐 + 방사선 종류) -->
     <div class="absolute bottom-8 left-1/2 -translate-x-1/2 w-[94%] max-w-lg pointer-events-auto flex flex-col gap-2">
         
-        <!-- [신규] 차폐체 패널 (선원 배치 후 나타남) -->
-        <div id="shield-controls" class="flex gap-2 hidden w-full">
-            <select id="shield-type" class="flex-1 bg-slate-800 text-white p-3 rounded-xl border border-slate-600 font-bold outline-none text-[13px]">
-                <option value="none">차폐체 없음</option>
-                <option value="paper">종이 (Paper)</option>
-                <option value="plastic">플라스틱 (Plastic)</option>
-                <option value="lead">납 (Lead)</option>
-            </select>
-            <button id="shield-btn" class="flex-1 bg-indigo-600 py-3 rounded-xl font-bold text-white shadow-lg active:scale-95 text-[13px] uppercase transition-all">
-                🛡️ 2m 앞에 배치
+        <!-- [신규 구조] 차폐체 및 방사선 종류 선택 패널 (선원 배치 후 나타남) -->
+        <div id="shield-controls" class="flex-col gap-2 hidden w-full">
+            <div class="flex gap-2 w-full">
+                <!-- 실시간 방사선 종류 변경 -->
+                <select id="live-rad-type" class="flex-1 bg-slate-800 text-amber-400 p-3 rounded-xl border border-slate-600 font-bold outline-none text-[13px] text-center text-center">
+                    <option value="alpha">알파선 (α)</option>
+                    <option value="beta">베타선 (β)</option>
+                    <option value="gamma">감마선 (γ)</option>
+                </select>
+                <!-- 실시간 차폐체 변경 -->
+                <select id="shield-type" class="flex-1 bg-slate-800 text-sky-300 p-3 rounded-xl border border-slate-600 font-bold outline-none text-[13px] text-center text-center">
+                    <option value="none">차폐체 없음</option>
+                    <option value="paper">종이 (Paper)</option>
+                    <option value="plastic">플라스틱 (Plastic)</option>
+                    <option value="lead">납 (Lead)</option>
+                </select>
+            </div>
+            <button id="shield-btn" class="w-full bg-indigo-600 py-3 rounded-xl font-bold text-white shadow-lg active:scale-95 text-[13px] uppercase transition-all">
+                🛡️ 선택한 차폐체를 2m 앞에 설치/변경
             </button>
         </div>
 
@@ -115,7 +115,7 @@
             <button id="place-btn" class="w-full bg-amber-600 py-4 rounded-xl font-bold text-white shadow-lg active:scale-95 text-[14px] uppercase transition-all border border-amber-400/50">
                 📍 조준점 3m 앞에 선원 고정
             </button>
-            <button id="reset-btn" class="w-full bg-slate-700 py-4 rounded-xl font-bold text-white shadow-lg active:scale-95 text-[14px] uppercase transition-all hidden">
+            <button id="reset-btn" class="w-full bg-slate-700 py-3 rounded-xl font-bold text-white shadow-lg active:scale-95 text-[13px] uppercase transition-all hidden">
                 초기화
             </button>
         </div>
@@ -142,7 +142,7 @@
         </a-ring>
     </a-entity>
 
-    <!-- [신규] 차폐체 (반투명 벽) -->
+    <!-- 차폐체 (반투명 벽) -->
     <a-entity id="shield-object" visible="false">
         <a-plane width="1.2" height="1.5" color="#ffffff" material="opacity: 0.5; transparent: true; side: double"></a-plane>
         <a-text id="shield-label" value="SHIELD" align="center" position="0 0.8 0" color="#ffffff" scale="0.6 0.6 0.6"></a-text>
@@ -158,16 +158,18 @@ let lastFrameTime = performance.now();
 let sourcePosition = new THREE.Vector3();
 
 // [신규] 차폐 관련 변수
-let radiationType = 'alpha';
 let shieldActive = false;
 let shieldMaterial = 'none';
 let shieldPosition = new THREE.Vector3();
 
-// [신규] 물리적 차폐 데이터 (남은 선량 투과율 비율)
+// [완벽 교정] 물리적 투과율 데이터 (1.0 = 100% 통과, 0.0 = 완벽 차폐)
 const shieldingData = {
-    alpha: { paper: 0.01, plastic: 0.00, lead: 0.00 }, // 종이만으로도 완벽 차단
-    beta:  { paper: 1.00, plastic: 0.10, lead: 0.00 }, // 플라스틱으로 90% 차단, 납으로 완벽 차단
-    gamma: { paper: 1.00, plastic: 1.00, lead: 0.40 }  // 납으로만 60% 차단 (40% 통과)
+    // 알파선: 종이, 플라스틱, 납 모두에 의해 완벽하게 차단됨
+    alpha: { none: 1.0, paper: 0.00, plastic: 0.00, lead: 0.00 },
+    // 베타선: 종이는 그냥 통과하지만 플라스틱, 납에는 완벽하게 차단됨
+    beta:  { none: 1.0, paper: 1.00, plastic: 0.00, lead: 0.00 },
+    // 감마선: 종이, 플라스틱은 통과하고 납으로만 감쇠됨 (예시로 90% 차단, 10% 통과로 설정)
+    gamma: { none: 1.0, paper: 1.00, plastic: 1.00, lead: 0.10 }  
 };
 
 const synth = new Tone.NoiseSynth({
@@ -182,13 +184,6 @@ document.getElementById('start-ar-btn').addEventListener('click', async () => {
     try {
         await Tone.start();
         baseDoseAt1m = parseFloat(document.getElementById('base-dose-input').value) || 100;
-        radiationType = document.getElementById('radiation-type').value;
-        
-        // 뱃지 업데이트
-        const badge = document.getElementById('rad-type-badge');
-        if(radiationType === 'alpha') badge.innerText = "알파선 (α)";
-        if(radiationType === 'beta') badge.innerText = "베타선 (β)";
-        if(radiationType === 'gamma') badge.innerText = "감마선 (γ)";
         
         const enterARBtn = document.querySelector('.a-enter-ar-button');
         if (enterARBtn) {
@@ -232,16 +227,33 @@ document.getElementById('place-btn').addEventListener('click', () => {
     
     document.getElementById('place-btn').classList.add('hidden');
     document.getElementById('reset-btn').classList.remove('hidden');
-    document.getElementById('shield-controls').classList.remove('hidden'); // 차폐체 패널 보이기
+    
+    // 차폐체 및 방사선 제어 패널 보이기
+    document.getElementById('shield-controls').classList.remove('hidden');
+    document.getElementById('shield-controls').classList.add('flex');
+    
     document.getElementById('crosshair').style.display = 'none';
     document.getElementById('manual-controls').style.display = 'flex';
     
     const statusMsg = document.getElementById('status-msg');
-    statusMsg.innerText = "3m 앞 배치 완료! 차폐체를 설치해보세요.";
+    statusMsg.innerText = "3m 앞 배치 완료! 종류와 차폐체를 변경하며 실습하세요.";
     statusMsg.className = "text-[12px] text-sky-400 font-bold";
 });
 
-// 3. [신규] 차폐체 배치 (2m 앞)
+// 방사선 종류 변경 시 알림 (자동 계산은 실시간 루프에서 처리)
+document.getElementById('live-rad-type').addEventListener('change', (e) => {
+    const types = { alpha: "알파선(α)", beta: "베타선(β)", gamma: "감마선(γ)" };
+    showToast(`방사선이 [ ${types[e.target.value]} ] 으로 변경되었습니다.`);
+});
+
+// 셀렉트 박스에서 차폐체 선택 시, 바로 적용 버튼이 눌린 것과 동일한 효과
+document.getElementById('shield-type').addEventListener('change', () => {
+    if(shieldActive || document.getElementById('shield-type').value !== 'none') {
+        document.getElementById('shield-btn').click();
+    }
+});
+
+// 3. 차폐체 배치 (2m 앞) 및 종류 변경 적용
 document.getElementById('shield-btn').addEventListener('click', () => {
     shieldMaterial = document.getElementById('shield-type').value;
     const sObj = document.getElementById('shield-object');
@@ -279,8 +291,8 @@ document.getElementById('shield-btn').addEventListener('click', () => {
         label.setAttribute('value', 'LEAD'); 
     }
     
-    sObj.object3D.lookAt(camera.position); // 차폐체가 사용자를 바라보게 설정
-    showToast("2m 앞에 차폐체가 설치되었습니다!");
+    sObj.object3D.lookAt(camera.position); 
+    showToast("2m 앞에 선택한 차폐체가 설치되었습니다!");
 });
 
 // 4. 가상 이동 (버튼)
@@ -312,7 +324,10 @@ function resetSystem() {
     
     document.getElementById('place-btn').classList.remove('hidden');
     document.getElementById('reset-btn').classList.add('hidden');
+    
     document.getElementById('shield-controls').classList.add('hidden');
+    document.getElementById('shield-controls').classList.remove('flex');
+    
     document.getElementById('manual-controls').style.display = 'none';
     document.getElementById('crosshair').style.display = 'block';
     
@@ -345,17 +360,19 @@ function update() {
         // 1m 거리 기준 역자승 법칙 계산
         let currentDoseRate = baseDoseAt1m * Math.pow(1.0 / dist, 2);
 
-        // [신규] 차폐 효과 적용 로직
+        // [핵심] 차폐 효과 적용 로직
         if (shieldActive) {
-            // 차폐체가 카메라(사용자)와 선원 사이에 정확히 위치하는지 수학적 판별
+            // 현재 선택된 방사선 종류 실시간 확인
+            let currentRadType = document.getElementById('live-rad-type').value;
+
             let camToShield = currentCamPos.distanceTo(shieldPosition);
             let camToSource = currentCamPos.distanceTo(sourcePosition);
             let sourceToShield = sourcePosition.distanceTo(shieldPosition);
             
-            // 사용자와 선원 사이의 거리가, (사용자-차폐체) 및 (선원-차폐체) 거리보다 둘 다 길어야 가운데 낀 것임
+            // 사용자와 선원 사이의 거리가, (사용자-차폐체) 및 (선원-차폐체) 거리보다 둘 다 길어야 차폐체 뒤에 숨어있는 것으로 간주
             if (camToShield < camToSource && sourceToShield < camToSource) {
-                const factor = shieldingData[radiationType][shieldMaterial] || 1.0;
-                currentDoseRate *= factor;
+                const factor = shieldingData[currentRadType][shieldMaterial];
+                currentDoseRate *= factor; // 투과율 곱하기
             }
         }
 
@@ -368,10 +385,13 @@ function update() {
         document.getElementById('cum-text').innerText = cumulativeDose.toFixed(4);
         doseDisp.innerText = currentDoseRate.toFixed(2);
 
+        // 선량 크기에 따른 시각적 경고
         if (currentDoseRate > baseDoseAt1m * 1.5) {
             doseDisp.className = "font-orbitron text-7xl font-bold text-red-500 hazard-glow leading-none tracking-tighter";
         } else if (currentDoseRate > baseDoseAt1m * 0.5) {
             doseDisp.className = "font-orbitron text-7xl font-bold text-yellow-400 leading-none tracking-tighter";
+        } else if (currentDoseRate === 0) {
+            doseDisp.className = "font-orbitron text-7xl font-bold text-slate-500 leading-none tracking-tighter"; // 완벽 차폐시 회색
         } else {
             doseDisp.className = "font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter";
         }
