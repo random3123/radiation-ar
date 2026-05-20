@@ -3,143 +3,403 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Radiation AR - Shielding Lab</title>
+    <title>Radiation AR - Hybrid Shielding Lab</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; overflow: hidden; background: #0f172a; font-family: 'Inter', sans-serif; touch-action: none; user-select: none; }
-        .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(56, 189, 248, 0.4); }
-        #crosshair { position: fixed; top: 50%; left: 50%; width: 24px; height: 24px; border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); z-index: 1000; pointer-events: none; display: none; }
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+        .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(56, 189, 248, 0.4); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        .hazard-glow { text-shadow: 0 0 20px rgba(239, 68, 68, 1); }
+        
+        #crosshair { position: fixed; top: 50%; left: 50%; width: 24px; height: 24px; border: 2px solid rgba(255, 255, 255, 0.8); border-radius: 50%; transform: translate(-50%, -50%); z-index: 1000; pointer-events: none; display: none; }
+        #crosshair::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: white; border-radius: 50%; transform: translate(-50%, -50%); }
+
         .a-enter-vr { display: none !important; }
     </style>
 </head>
 <body>
 
-<!-- 인트로 화면 -->
+<!-- 1. 앱 시작 인트로 화면 -->
 <div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-900 px-6">
-    <h1 class="text-3xl font-bold text-white mb-6">방사선 차폐 실습</h1>
-    <div class="bg-slate-800 p-6 rounded-xl w-full max-w-sm space-y-4">
-        <div>
-            <label class="text-xs text-slate-400 font-bold block mb-1">방사선 종류</label>
-            <select id="radiation-type" class="w-full bg-slate-900 text-white p-2 rounded">
-                <option value="alpha">알파선 (α)</option>
-                <option value="beta">베타선 (β)</option>
-                <option value="gamma">감마선 (γ)</option>
-            </select>
-        </div>
-        <div>
-            <label class="text-xs text-slate-400 font-bold block mb-1">기준 선량 (1m 기준, mSv/h)</label>
-            <input type="number" id="base-dose-input" value="100" class="w-full bg-slate-900 text-white p-2 rounded">
-        </div>
+    <div class="w-20 h-20 bg-sky-500 rounded-full flex items-center justify-center mb-4 shadow-[0_0_40px_rgba(14,165,233,0.6)]">
+        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
     </div>
-    <button id="start-ar-btn" class="mt-8 bg-green-600 px-8 py-4 rounded-xl font-bold text-white w-full max-w-sm">실습 시작</button>
-</div>
-
-<!-- 실습 UI -->
-<div id="ui-overlay" class="absolute inset-0 z-50 hidden" style="pointer-events: none;">
-    <div id="crosshair"></div>
-    <div class="absolute top-4 left-1/2 -translate-x-1/2 w-[94%] max-w-lg glass rounded-2xl p-4 text-center">
-        <div id="dose-display" class="font-orbitron text-6xl font-bold text-green-400">0.00</div>
-        <div id="dist-text" class="text-sky-300 font-bold">거리: 0.00m</div>
-    </div>
+    <h1 class="text-3xl font-orbitron font-bold text-white mb-2 text-center">AR 방사선 실습계측기</h1>
+    <p class="text-sky-400 font-bold mb-6 text-center text-sm">도보/가상 이동 + 차폐 시뮬레이션</p>
     
-    <div class="absolute bottom-8 left-1/2 -translate-x-1/2 w-[94%] max-w-lg pointer-events-auto space-y-3">
-        <select id="shield-type" class="w-full p-3 bg-slate-800 text-white rounded-xl border border-slate-600">
-            <option value="none">차폐체 없음</option>
-            <option value="paper">종이 (Paper)</option>
-            <option value="plastic">플라스틱 (Plastic)</option>
-            <option value="lead">납 (Lead)</option>
+    <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 mb-8 max-w-sm text-center shadow-xl w-full">
+        
+        <!-- [신규] 방사선 종류 선택 -->
+        <label class="text-[11px] text-slate-400 uppercase font-bold block mb-2">실습 방사선 종류</label>
+        <select id="radiation-type" class="w-full bg-slate-900 border border-slate-600 rounded-lg py-2 px-2 text-white text-center font-bold mb-4 focus:border-sky-500 outline-none">
+            <option value="alpha">알파선 (α)</option>
+            <option value="beta">베타선 (β)</option>
+            <option value="gamma">감마선 (γ)</option>
         </select>
-        <div class="flex gap-2">
-            <button id="place-btn" class="flex-1 bg-rose-600 py-4 rounded-xl font-bold text-white">📍 선원 고정 (3m)</button>
-            <button id="shield-btn" class="flex-1 bg-indigo-600 py-4 rounded-xl font-bold text-white">🛡️ 차폐체 배치 (2m)</button>
+
+        <label class="text-[11px] text-slate-400 uppercase font-bold block mb-2">실습 기준 선량 (1m 거리 기준)</label>
+        <div class="flex items-center justify-center gap-2">
+            <input type="number" id="base-dose-input" value="100" class="w-24 bg-slate-900 border border-slate-600 rounded-lg py-2 px-2 text-white text-center font-orbitron text-xl focus:border-sky-500 outline-none">
+            <span class="text-slate-400 font-bold">mSv/h</span>
         </div>
-        <button id="reset-btn" class="w-full bg-slate-700 py-3 rounded-xl font-bold text-white hidden">초기화</button>
+        <p class="text-slate-400 text-[10px] mt-3">선원은 스마트폰 정면 <span class="text-amber-400 font-bold">3m 앞</span>에 생성됩니다.</p>
+    </div>
+
+    <button id="start-ar-btn" class="bg-green-600 hover:bg-green-500 px-8 py-4 rounded-2xl font-bold text-lg shadow-[0_0_20px_rgba(22,163,74,0.5)] transition-all active:scale-95 w-full max-w-sm text-white">
+        실습 시작 (카메라 켜기)
+    </button>
+</div>
+
+<!-- 2. AR 실행 중 UI 오버레이 -->
+<div id="ui-overlay" class="absolute inset-0 z-50 hidden" style="pointer-events: none;">
+    
+    <div id="crosshair"></div>
+
+    <!-- 상단 HUD -->
+    <div class="absolute top-4 left-1/2 -translate-x-1/2 w-[94%] max-w-lg glass rounded-2xl p-4">
+        <div class="flex justify-between items-center mb-1">
+            <span id="status-msg" class="text-[12px] text-amber-400 font-bold animate-pulse">원하는 위치를 조준하고 배치하세요</span>
+            <span id="rad-type-badge" class="text-[10px] bg-red-600 px-2 py-1 rounded text-white font-bold uppercase"></span>
+        </div>
+        
+        <div class="text-center py-1">
+            <div id="dose-display" class="font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter">0.00</div>
+            <div class="text-lg text-green-400 font-bold mt-1">mSv/h</div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mt-3 border-t border-slate-700/50 pt-3">
+            <div class="text-center">
+                <div class="text-[10px] text-slate-400 uppercase font-bold tracking-tighter mb-1">선원과의 물리적 거리</div>
+                <div id="dist-text" class="font-orbitron text-3xl text-sky-300">0.00 <span class="text-sm">m</span></div>
+            </div>
+            <div class="text-center border-l border-slate-700/50">
+                <div class="text-[10px] text-slate-400 uppercase font-bold tracking-tighter mb-1">누적 피폭량</div>
+                <div id="cum-text" class="font-orbitron text-3xl text-amber-400">0.0000</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 가상 이동(가까워지기/멀어지기) 버튼 패널 -->
+    <div id="manual-controls" class="absolute right-4 top-1/2 -translate-y-1/2 flex-col gap-3 pointer-events-auto hidden">
+        <div class="glass p-3 rounded-2xl flex flex-col items-center gap-3 border border-sky-500/30">
+            <span class="text-[10px] text-sky-300 font-bold tracking-widest text-center">가상<br>이동</span>
+            <button onclick="moveSource(-0.5)" class="w-14 h-14 bg-rose-600 rounded-full text-white font-bold active:scale-90 transition-all shadow-[0_0_15px_rgba(225,29,72,0.6)] text-[11px] leading-tight flex flex-col items-center justify-center">
+                ▲<br>접근
+            </button>
+            <button onclick="moveSource(0.5)" class="w-14 h-14 bg-sky-600 rounded-full text-white font-bold active:scale-90 transition-all shadow-[0_0_15px_rgba(2,132,199,0.6)] text-[11px] leading-tight flex flex-col items-center justify-center">
+                ▼<br>후퇴
+            </button>
+        </div>
+    </div>
+
+    <!-- 하단 컨트롤 버튼 (배치 + 차폐) -->
+    <div class="absolute bottom-8 left-1/2 -translate-x-1/2 w-[94%] max-w-lg pointer-events-auto flex flex-col gap-2">
+        
+        <!-- [신규] 차폐체 패널 (선원 배치 후 나타남) -->
+        <div id="shield-controls" class="flex gap-2 hidden w-full">
+            <select id="shield-type" class="flex-1 bg-slate-800 text-white p-3 rounded-xl border border-slate-600 font-bold outline-none text-[13px]">
+                <option value="none">차폐체 없음</option>
+                <option value="paper">종이 (Paper)</option>
+                <option value="plastic">플라스틱 (Plastic)</option>
+                <option value="lead">납 (Lead)</option>
+            </select>
+            <button id="shield-btn" class="flex-1 bg-indigo-600 py-3 rounded-xl font-bold text-white shadow-lg active:scale-95 text-[13px] uppercase transition-all">
+                🛡️ 2m 앞에 배치
+            </button>
+        </div>
+
+        <div class="flex gap-2 w-full">
+            <button id="place-btn" class="w-full bg-amber-600 py-4 rounded-xl font-bold text-white shadow-lg active:scale-95 text-[14px] uppercase transition-all border border-amber-400/50">
+                📍 조준점 3m 앞에 선원 고정
+            </button>
+            <button id="reset-btn" class="w-full bg-slate-700 py-4 rounded-xl font-bold text-white shadow-lg active:scale-95 text-[14px] uppercase transition-all hidden">
+                초기화
+            </button>
+        </div>
     </div>
 </div>
 
-<a-scene webxr="optionalFeatures: dom-overlay; overlayElement: #ui-overlay" renderer="alpha: true; antialias: true">
+<!-- 3. WebXR AR 공간 환경 설정 -->
+<a-scene 
+    webxr="optionalFeatures: dom-overlay; overlayElement: #ui-overlay"
+    vr-mode-ui="enabled: true"
+    renderer="alpha: true; antialias: true">
+    
     <a-camera id="main-camera" position="0 1.6 0"></a-camera>
+
+    <!-- 방사선원 -->
     <a-entity id="radiation-source" visible="false">
-        <a-sphere radius="0.08" color="#ff0000"></a-sphere>
+        <a-sphere radius="0.1" color="#ff0000" material="emissive: #ff0000; emissiveIntensity: 3"
+                  animation="property: scale; from: 1 1 1; to: 1.2 1.2 1.2; dir: alternate; loop: true; dur: 500">
+        </a-sphere>
+        <a-text id="source-label" value="SOURCE" align="center" position="0 0.35 0" color="#ff4444" scale="0.6 0.6 0.6"></a-text>
+        <a-ring radius-inner="0.13" radius-outer="0.17" color="#ff0000" material="opacity: 0.8; side: double"
+                animation__scale="property: scale; from: 1 1 1; to: 5 5 5; loop: true; dur: 1500; easing: linear"
+                animation__opacity="property: material.opacity; from: 0.8; to: 0; loop: true; dur: 1500; easing: linear">
+        </a-ring>
     </a-entity>
+
+    <!-- [신규] 차폐체 (반투명 벽) -->
     <a-entity id="shield-object" visible="false">
-        <a-plane width="1.5" height="1.5" color="#ffffff" material="opacity: 0.5"></a-plane>
+        <a-plane width="1.2" height="1.5" color="#ffffff" material="opacity: 0.5; transparent: true; side: double"></a-plane>
+        <a-text id="shield-label" value="SHIELD" align="center" position="0 0.8 0" color="#ffffff" scale="0.6 0.6 0.6"></a-text>
     </a-entity>
 </a-scene>
 
 <script>
-let state = { targetLocked: false, radiationType: 'alpha', baseDose: 100, sourcePos: null, shieldPos: null, shieldActive: false, shieldMaterial: 'none' };
+// --- 전역 변수 ---
+let targetLocked = false;
+let baseDoseAt1m = 100;
+let cumulativeDose = 0;
+let lastFrameTime = performance.now();
+let sourcePosition = new THREE.Vector3();
 
-// 차폐 데이터 (남은 선량 비율)
+// [신규] 차폐 관련 변수
+let radiationType = 'alpha';
+let shieldActive = false;
+let shieldMaterial = 'none';
+let shieldPosition = new THREE.Vector3();
+
+// [신규] 물리적 차폐 데이터 (남은 선량 투과율 비율)
 const shieldingData = {
-    alpha: { paper: 0.01, plastic: 0, lead: 0 },
-    beta: { paper: 1.0, plastic: 0.1, lead: 0 },
-    gamma: { paper: 1.0, plastic: 1.0, lead: 0.4 }
+    alpha: { paper: 0.01, plastic: 0.00, lead: 0.00 }, // 종이만으로도 완벽 차단
+    beta:  { paper: 1.00, plastic: 0.10, lead: 0.00 }, // 플라스틱으로 90% 차단, 납으로 완벽 차단
+    gamma: { paper: 1.00, plastic: 1.00, lead: 0.40 }  // 납으로만 60% 차단 (40% 통과)
 };
 
-document.getElementById('start-ar-btn').addEventListener('click', () => {
-    state.radiationType = document.getElementById('radiation-type').value;
-    state.baseDose = parseFloat(document.getElementById('base-dose-input').value);
-    document.querySelector('.a-enter-ar-button').click();
+const synth = new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.001, decay: 0.015, sustain: 0 }
+}).toDestination();
+
+const sceneEl = document.querySelector('a-scene');
+
+// 1. 실습 시작
+document.getElementById('start-ar-btn').addEventListener('click', async () => {
+    try {
+        await Tone.start();
+        baseDoseAt1m = parseFloat(document.getElementById('base-dose-input').value) || 100;
+        radiationType = document.getElementById('radiation-type').value;
+        
+        // 뱃지 업데이트
+        const badge = document.getElementById('rad-type-badge');
+        if(radiationType === 'alpha') badge.innerText = "알파선 (α)";
+        if(radiationType === 'beta') badge.innerText = "베타선 (β)";
+        if(radiationType === 'gamma') badge.innerText = "감마선 (γ)";
+        
+        const enterARBtn = document.querySelector('.a-enter-ar-button');
+        if (enterARBtn) {
+            enterARBtn.click();
+        } else {
+            alert("기기 또는 브라우저가 공간 인식(WebXR)을 지원하지 않습니다.");
+        }
+    } catch (e) {
+        console.error(e);
+    }
 });
 
-document.querySelector('a-scene').addEventListener('enter-vr', () => {
-    document.getElementById('intro-screen').style.display = 'none';
-    document.getElementById('ui-overlay').style.display = 'block';
-    document.getElementById('crosshair').style.display = 'block';
+sceneEl.addEventListener('enter-vr', () => {
+    if (sceneEl.is('ar-mode')) {
+        document.getElementById('intro-screen').style.display = 'none';
+        document.getElementById('ui-overlay').style.display = 'block';
+        document.getElementById('crosshair').style.display = 'block';
+        lastFrameTime = performance.now();
+    }
 });
 
-// 선원 배치 (3m 앞)
+sceneEl.addEventListener('exit-vr', () => {
+    document.getElementById('intro-screen').style.display = 'flex';
+    document.getElementById('ui-overlay').style.display = 'none';
+    resetSystem();
+});
+
+// 2. 선원 배치 (3m 앞)
 document.getElementById('place-btn').addEventListener('click', () => {
     const camera = document.getElementById('main-camera').object3D;
-    state.sourcePos = new THREE.Vector3(0, 0, -3).applyMatrix4(camera.matrixWorld);
-    document.getElementById('radiation-source').setAttribute('position', state.sourcePos);
-    document.getElementById('radiation-source').setAttribute('visible', 'true');
-    state.targetLocked = true;
+    const sourceEl = document.getElementById('radiation-source');
+
+    sourcePosition.set(0, 0, -3);
+    camera.localToWorld(sourcePosition);
+    
+    sourceEl.setAttribute('position', `${sourcePosition.x} ${sourcePosition.y} ${sourcePosition.z}`);
+    sourceEl.setAttribute('visible', 'true');
+
+    targetLocked = true;
+    cumulativeDose = 0;
+    
     document.getElementById('place-btn').classList.add('hidden');
     document.getElementById('reset-btn').classList.remove('hidden');
-});
-
-// 차폐체 배치 (2m 앞)
-document.getElementById('shield-btn').addEventListener('click', () => {
-    const camera = document.getElementById('main-camera').object3D;
-    state.shieldMaterial = document.getElementById('shield-type').value;
-    if(state.shieldMaterial === 'none') return;
+    document.getElementById('shield-controls').classList.remove('hidden'); // 차폐체 패널 보이기
+    document.getElementById('crosshair').style.display = 'none';
+    document.getElementById('manual-controls').style.display = 'flex';
     
-    state.shieldPos = new THREE.Vector3(0, 0, -2).applyMatrix4(camera.matrixWorld);
-    const sObj = document.getElementById('shield-object');
-    sObj.setAttribute('position', state.shieldPos);
-    sObj.setAttribute('visible', 'true');
-    state.shieldActive = true;
-    sObj.object3D.lookAt(camera.position); // 사용자를 바라보게
+    const statusMsg = document.getElementById('status-msg');
+    statusMsg.innerText = "3m 앞 배치 완료! 차폐체를 설치해보세요.";
+    statusMsg.className = "text-[12px] text-sky-400 font-bold";
 });
 
+// 3. [신규] 차폐체 배치 (2m 앞)
+document.getElementById('shield-btn').addEventListener('click', () => {
+    shieldMaterial = document.getElementById('shield-type').value;
+    const sObj = document.getElementById('shield-object');
+    
+    if(shieldMaterial === 'none') {
+        shieldActive = false;
+        sObj.setAttribute('visible', 'false');
+        showToast("차폐체를 제거했습니다.");
+        return;
+    }
+    
+    const camera = document.getElementById('main-camera').object3D;
+    
+    // 차폐체를 카메라 정면 2m에 배치
+    shieldPosition.set(0, 0, -2);
+    camera.localToWorld(shieldPosition);
+    
+    sObj.setAttribute('position', `${shieldPosition.x} ${shieldPosition.y} ${shieldPosition.z}`);
+    sObj.setAttribute('visible', 'true');
+    shieldActive = true;
+    
+    // 차폐체 종류에 따른 시각적 변화
+    const plane = sObj.querySelector('a-plane');
+    const label = sObj.querySelector('a-text');
+    if(shieldMaterial === 'paper') { 
+        plane.setAttribute('color', '#fcd34d'); // 노란색(종이)
+        label.setAttribute('value', 'PAPER'); 
+    }
+    if(shieldMaterial === 'plastic') { 
+        plane.setAttribute('color', '#38bdf8'); // 파란색(플라스틱)
+        label.setAttribute('value', 'PLASTIC'); 
+    }
+    if(shieldMaterial === 'lead') { 
+        plane.setAttribute('color', '#94a3b8'); // 회색(납)
+        label.setAttribute('value', 'LEAD'); 
+    }
+    
+    sObj.object3D.lookAt(camera.position); // 차폐체가 사용자를 바라보게 설정
+    showToast("2m 앞에 차폐체가 설치되었습니다!");
+});
+
+// 4. 가상 이동 (버튼)
+function moveSource(deltaDistance) {
+    if (!targetLocked) return;
+    
+    let currentCamPos = new THREE.Vector3();
+    document.getElementById('main-camera').object3D.getWorldPosition(currentCamPos);
+    
+    let direction = new THREE.Vector3().subVectors(sourcePosition, currentCamPos).normalize();
+    sourcePosition.add(direction.multiplyScalar(deltaDistance));
+    
+    if (currentCamPos.distanceTo(sourcePosition) < 0.1) {
+        direction.normalize(); 
+        sourcePosition.copy(currentCamPos).add(direction.multiplyScalar(0.1));
+    }
+    
+    document.getElementById('radiation-source').setAttribute('position', `${sourcePosition.x} ${sourcePosition.y} ${sourcePosition.z}`);
+}
+
+// 5. 초기화
+function resetSystem() {
+    targetLocked = false;
+    shieldActive = false;
+    cumulativeDose = 0;
+    
+    document.getElementById('radiation-source').setAttribute('visible', 'false');
+    document.getElementById('shield-object').setAttribute('visible', 'false');
+    
+    document.getElementById('place-btn').classList.remove('hidden');
+    document.getElementById('reset-btn').classList.add('hidden');
+    document.getElementById('shield-controls').classList.add('hidden');
+    document.getElementById('manual-controls').style.display = 'none';
+    document.getElementById('crosshair').style.display = 'block';
+    
+    const doseDisp = document.getElementById('dose-display');
+    doseDisp.innerText = "0.00";
+    doseDisp.className = "font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter";
+    document.getElementById('dist-text').innerHTML = `0.00 <span class="text-sm">m</span>`;
+    document.getElementById('cum-text').innerText = "0.0000";
+    
+    const statusMsg = document.getElementById('status-msg');
+    statusMsg.innerText = "원하는 위치를 조준하고 배치하세요";
+    statusMsg.className = "text-[12px] text-amber-400 font-bold animate-pulse";
+}
+document.getElementById('reset-btn').addEventListener('click', resetSystem);
+
+// 6. 실시간 위치 계산 및 업데이트 루프
+let nextTickTime = 0;
 function update() {
-    if (state.targetLocked) {
-        const cam = document.getElementById('main-camera').object3D;
-        const camPos = new THREE.Vector3().setFromMatrixPosition(cam.matrixWorld);
-        const dist = camPos.distanceTo(state.sourcePos);
+    if (targetLocked && sceneEl.is('ar-mode')) {
+        const now = performance.now();
+        const dtHours = (now - lastFrameTime) / 3600000;
+        lastFrameTime = now;
+
+        let currentCamPos = new THREE.Vector3();
+        document.getElementById('main-camera').object3D.getWorldPosition(currentCamPos);
         
-        // 차폐 효과 계산 (사용자가 선원과 차폐체 사이에 있는 경우만)
-        let dose = state.baseDose * Math.pow(1.0 / Math.max(0.1, dist), 2);
-        
-        if (state.shieldActive && camPos.distanceTo(state.sourcePos) > camPos.distanceTo(state.shieldPos)) {
-            const factor = shieldingData[state.radiationType][state.shieldMaterial] || 1.0;
-            dose *= factor;
+        let dist = currentCamPos.distanceTo(sourcePosition);
+        dist = Math.max(0.1, dist);
+
+        // 1m 거리 기준 역자승 법칙 계산
+        let currentDoseRate = baseDoseAt1m * Math.pow(1.0 / dist, 2);
+
+        // [신규] 차폐 효과 적용 로직
+        if (shieldActive) {
+            // 차폐체가 카메라(사용자)와 선원 사이에 정확히 위치하는지 수학적 판별
+            let camToShield = currentCamPos.distanceTo(shieldPosition);
+            let camToSource = currentCamPos.distanceTo(sourcePosition);
+            let sourceToShield = sourcePosition.distanceTo(shieldPosition);
+            
+            // 사용자와 선원 사이의 거리가, (사용자-차폐체) 및 (선원-차폐체) 거리보다 둘 다 길어야 가운데 낀 것임
+            if (camToShield < camToSource && sourceToShield < camToSource) {
+                const factor = shieldingData[radiationType][shieldMaterial] || 1.0;
+                currentDoseRate *= factor;
+            }
         }
 
-        document.getElementById('dose-display').innerText = dose.toFixed(2);
-        document.getElementById('dist-text').innerText = `거리: ${dist.toFixed(1)}m`;
+        cumulativeDose += currentDoseRate * dtHours;
+
+        document.getElementById('source-label').setAttribute('value', `SOURCE\n${currentDoseRate.toFixed(1)} mSv/h`);
+        
+        const doseDisp = document.getElementById('dose-display');
+        document.getElementById('dist-text').innerHTML = `${dist.toFixed(2)} <span class="text-sm">m</span>`;
+        document.getElementById('cum-text').innerText = cumulativeDose.toFixed(4);
+        doseDisp.innerText = currentDoseRate.toFixed(2);
+
+        if (currentDoseRate > baseDoseAt1m * 1.5) {
+            doseDisp.className = "font-orbitron text-7xl font-bold text-red-500 hazard-glow leading-none tracking-tighter";
+        } else if (currentDoseRate > baseDoseAt1m * 0.5) {
+            doseDisp.className = "font-orbitron text-7xl font-bold text-yellow-400 leading-none tracking-tighter";
+        } else {
+            doseDisp.className = "font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter";
+        }
+
+        const tickInterval = Math.max(20, 1000 / (currentDoseRate * 0.5 + 1));
+        if (now > nextTickTime && currentDoseRate > 0) { // 선량이 0이면 소리 안남
+            synth.triggerAttackRelease("32n");
+            nextTickTime = now + tickInterval;
+        }
+
+        document.getElementById('radiation-source').object3D.lookAt(currentCamPos);
     }
+    
     requestAnimationFrame(update);
 }
-update();
 
-function resetSystem() { location.reload(); }
-document.getElementById('reset-btn').addEventListener('click', resetSystem);
+function showToast(msg) {
+    const t = document.createElement('div');
+    t.className = "fixed top-[30%] left-1/2 -translate-x-1/2 bg-slate-900/95 text-white px-6 py-3 rounded-xl z-[3000] border border-sky-500 text-[13px] font-bold shadow-[0_0_20px_rgba(0,0,0,0.8)] transition-all duration-300 pointer-events-none text-center whitespace-nowrap";
+    t.innerText = msg;
+    document.getElementById('ui-overlay').appendChild(t);
+    setTimeout(() => {
+        t.style.opacity = '0';
+        setTimeout(() => t.remove(), 500);
+    }, 2000);
+}
+
+update();
 </script>
 </body>
 </html>
