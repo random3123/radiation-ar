@@ -4,8 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Radiation Indoor Lab - Motion Sensing</title>
-    <!-- 최신 A-Frame -->
+    <title>Radiation AR - Precision Tracker</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
@@ -13,11 +12,17 @@
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Inter', sans-serif; touch-action: none; }
         .font-orbitron { font-family: 'Orbitron', sans-serif; }
-        #camera-feed { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; opacity: 0.6; }
-        .glass { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(12px); border: 1px solid rgba(56, 189, 248, 0.4); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-        .hazard-glow { text-shadow: 0 0 15px rgba(239, 68, 68, 0.9); }
-        #crosshair { position: fixed; top: 50%; left: 50%; width: 30px; height: 30px; border: 2px dashed rgba(56, 189, 248, 0.6); border-radius: 50%; transform: translate(-50%, -50%); z-index: 1000; pointer-events: none; }
-        #crosshair::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: #38bdf8; border-radius: 50%; transform: translate(-50%, -50%); }
+        #camera-feed { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; opacity: 0.7; }
+        .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(56, 189, 248, 0.4); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        .hazard-glow { text-shadow: 0 0 20px rgba(239, 68, 68, 1); }
+        
+        /* 조준점 디자인 */
+        #crosshair { position: fixed; top: 50%; left: 50%; width: 40px; height: 40px; border: 2px solid rgba(56, 189, 248, 0.8); border-radius: 50%; transform: translate(-50%, -50%); z-index: 1000; pointer-events: none; transition: all 0.2s; }
+        #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #38bdf8; }
+        #crosshair::before { top: 50%; left: -10px; width: 60px; height: 2px; transform: translateY(-50%); }
+        #crosshair::after { left: 50%; top: -10px; height: 60px; width: 2px; transform: translateX(-50%); }
+        
+        #touch-surface { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 999; cursor: crosshair; }
     </style>
 </head>
 <body class="text-slate-100">
@@ -25,86 +30,85 @@
 <video id="camera-feed" autoplay playsinline muted></video>
 <div id="crosshair"></div>
 
-<!-- 상단 메인 HUD -->
+<!-- 화면 전체를 덮는 터치 감지 영역 -->
+<div id="touch-surface" onclick="handlePlaceSource()"></div>
+
+<!-- 상단 메인 HUD (터치 방해 안 함) -->
 <div id="ui-header" class="fixed top-4 left-1/2 -translate-x-1/2 w-[94%] max-w-lg glass rounded-2xl p-5 z-[1001] pointer-events-none">
-    <div class="flex justify-between items-center mb-1">
-        <span class="text-[10px] text-sky-400 font-bold tracking-widest uppercase">Indoor Lab AR v8.0</span>
+    <div class="flex justify-between items-center mb-2">
+        <span class="text-[11px] text-sky-400 font-bold tracking-widest uppercase">실내 정밀 계측 모드 v9.0</span>
         <div class="flex items-center gap-2">
-            <span id="step-indicator" class="text-[9px] font-bold text-yellow-400 opacity-0 transition-opacity duration-200 uppercase">발걸음 감지됨!</span>
-            <span id="motion-status" class="text-[9px] text-slate-400 font-mono ml-2">SENSOR: STANDBY</span>
-            <div id="status-light" class="w-2.5 h-2.5 rounded-full bg-slate-600"></div>
+            <span id="step-indicator" class="text-[10px] font-bold text-yellow-400 opacity-0 transition-opacity duration-200">발걸음 감지!</span>
+            <div id="status-light" class="w-3 h-3 rounded-full bg-slate-600"></div>
         </div>
     </div>
     
     <div class="text-center py-2">
-        <div id="instruction" class="text-[11px] text-amber-400 font-bold mb-1 uppercase tracking-tighter animate-pulse">화면 중앙을 사물에 맞추고 터치하세요</div>
-        <div id="dose-display" class="font-orbitron text-6xl font-bold text-green-400 leading-none">0.00 <span class="text-xl font-normal">mSv/h</span></div>
+        <div id="instruction" class="text-[12px] text-amber-400 font-bold mb-1 uppercase animate-pulse">화면 중앙을 사물에 맞추고 화면을 터치하세요</div>
+        <div id="dose-display" class="font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter">0.00</div>
+        <div class="text-lg text-green-400 font-bold mt-1">mSv/h</div>
     </div>
 
     <div class="grid grid-cols-2 gap-4 mt-4 border-t border-slate-700/50 pt-4">
         <div class="text-center">
-            <div class="text-[9px] text-slate-500 uppercase font-bold tracking-tighter">Distance from Source</div>
-            <div id="dist-text" class="font-orbitron text-2xl text-sky-300">0.00 m</div>
+            <div class="text-[10px] text-slate-400 uppercase font-bold tracking-tighter">선원과의 거리</div>
+            <div id="dist-text" class="font-orbitron text-3xl text-sky-300">0.00 m</div>
         </div>
         <div class="text-center border-l border-slate-700/50">
-            <div class="text-[9px] text-slate-500 uppercase font-bold tracking-tighter">Total Exposure</div>
-            <div id="cum-text" class="font-orbitron text-2xl text-amber-400">0.000000</div>
+            <div class="text-[10px] text-slate-400 uppercase font-bold tracking-tighter">누적 피폭량</div>
+            <div id="cum-text" class="font-orbitron text-3xl text-amber-400">0.000</div>
         </div>
     </div>
 </div>
 
 <!-- 하단 컨트롤 패널 -->
-<div id="control-panel" class="fixed bottom-8 left-1/2 -translate-x-1/2 w-[94%] max-w-lg z-[1002]">
-    <div class="glass p-5 rounded-2xl border-t-2 border-sky-500/30">
+<div id="control-panel" class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-lg z-[1002]">
+    <div class="glass p-5 rounded-2xl">
         <div class="flex flex-col gap-4">
-            <div class="flex justify-between items-end gap-4">
-                <div class="flex-1">
-                    <label class="text-[10px] text-slate-400 uppercase font-bold ml-1">Source Intensity (at 0.5m)</label>
-                    <div class="relative mt-1">
-                        <input type="number" id="base-dose-input" value="100" class="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 px-4 text-white text-xl font-orbitron focus:border-sky-500 outline-none">
-                        <span class="absolute right-4 top-3.5 text-slate-500 font-bold">mSv/h</span>
-                    </div>
+            <div>
+                <label class="text-[11px] text-slate-400 uppercase font-bold ml-1">설정 선량 (50cm 앞 기준)</label>
+                <div class="relative mt-1">
+                    <input type="number" id="base-dose-input" value="100" class="w-full bg-slate-900 border border-slate-600 rounded-xl py-3 px-4 text-white text-2xl font-orbitron focus:border-sky-500 outline-none">
+                    <span class="absolute right-4 top-3 text-slate-400 font-bold text-lg">mSv/h</span>
                 </div>
             </div>
             
             <div class="grid grid-cols-2 gap-3">
-                <button onclick="initSensors()" class="bg-sky-600 hover:bg-sky-500 py-4 rounded-xl font-bold text-white shadow-[0_0_15px_rgba(2,132,199,0.4)] transition-all active:scale-95 text-sm uppercase">
-                    센서/카메라 켜기
+                <button onclick="initSensors()" class="bg-sky-600 hover:bg-sky-500 py-4 rounded-xl font-bold text-white shadow-[0_0_15px_rgba(2,132,199,0.5)] active:scale-95 text-[13px] uppercase">
+                    1. 센서 활성화
                 </button>
-                <button onclick="resetSystem()" class="bg-slate-800 hover:bg-slate-700 py-4 rounded-xl font-bold text-slate-300 border border-slate-600 transition-all active:scale-95 text-sm uppercase">
-                    시스템 리셋
+                <button onclick="resetSystem()" class="bg-slate-800 hover:bg-slate-700 py-4 rounded-xl font-bold text-slate-300 border border-slate-600 active:scale-95 text-[13px] uppercase">
+                    시스템 초기화
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- AR 씬 -->
+<!-- AR 씬 (가상 공간) -->
 <a-scene embedded vr-mode-ui="enabled: false" renderer="alpha: true; antialias: true;">
-    <!-- 카메라를 감싸는 Rig (실내 이동 반영) -->
+    <!-- 카메라 Rig (이동 주체) -->
     <a-entity id="rig" position="0 1.6 0">
         <a-camera id="main-camera" look-controls="pointerLockEnabled: false"></a-camera>
     </a-entity>
 
-    <!-- 방사선원 AR 객체 -->
+    <!-- 방사선원 (빨간 구체) -->
     <a-entity id="radiation-source" visible="false">
-        <!-- 메인 구체 (애니메이션 최신 문법으로 수정) -->
-        <a-sphere radius="0.08" color="#ff0000" material="emissive: #ff0000; emissiveIntensity: 4"
-                  animation="property: scale; from: 1 1 1; to: 1.3 1.3 1.3; dir: alternate; loop: true; dur: 500">
+        <!-- 메인 구체 (크기 축소하여 시야 확보) -->
+        <a-sphere radius="0.04" color="#ff0000" material="emissive: #ff0000; emissiveIntensity: 3"
+                  animation="property: scale; from: 1 1 1; to: 1.5 1.5 1.5; dir: alternate; loop: true; dur: 600">
         </a-sphere>
         
-        <!-- 실시간 텍스트 라벨 -->
-        <a-text id="source-label" value="SOURCE: 100 mSv/h" align="center" position="0 0.2 0" color="#ff4444" scale="0.4 0.4 0.4"></a-text>
+        <!-- 실시간 허공 텍스트 -->
+        <a-text id="source-label" value="SOURCE" align="center" position="0 0.15 0" color="#ff4444" scale="0.3 0.3 0.3" font="mozillavr"></a-text>
         
-        <!-- 파동 효과 고리 -->
-        <a-ring radius-inner="0.12" radius-outer="0.15" rotation="-90 0 0" color="#ff0000" material="opacity: 0.8"
-                animation__scale="property: scale; from: 1 1 1; to: 8 8 8; loop: true; dur: 2000; easing: linear"
-                animation__opacity="property: material.opacity; from: 0.8; to: 0; loop: true; dur: 2000; easing: linear">
+        <!-- 파동 이펙트 -->
+        <a-ring radius-inner="0.06" radius-outer="0.08" color="#ff0000" material="opacity: 0.8; side: double"
+                animation__scale="property: scale; from: 1 1 1; to: 6 6 6; loop: true; dur: 1500; easing: linear"
+                animation__opacity="property: material.opacity; from: 0.8; to: 0; loop: true; dur: 1500; easing: linear">
         </a-ring>
     </a-entity>
 </a-scene>
-
-<div id="touch-surface" class="fixed top-0 left-0 w-full h-full z-[1000] cursor-crosshair" onclick="handlePlaceSource()"></div>
 
 <script>
 let fixedSourcePos = new THREE.Vector3();
@@ -113,9 +117,9 @@ let targetLocked = false;
 let cumulativeDose = 0;
 let lastFrameTime = performance.now();
 
-// 감도 보정 (실습실 환경)
-const MOVEMENT_MULTIPLIER = 2.5; // 1걸음(약 0.4m) 감지 시 가상으로 1m 이동
-const STEP_THRESHOLD = 0.8;      // 걸음 감지 민감도 (숫자가 작을수록 더 민감하게 반응)
+// 보폭 및 센서 감도 설정
+const STEP_DISTANCE = 0.15;      // 1걸음당 실제 이동 거리 (15cm로 정밀 설정)
+const STEP_THRESHOLD = 1.0;      // 걸음 감지 민감도
 let lastAccel = { x: 0, y: 0, z: 0 };
 let stepCooldown = 0;
 
@@ -124,7 +128,7 @@ const synth = new Tone.NoiseSynth({
     envelope: { attack: 0.001, decay: 0.015, sustain: 0 }
 }).toDestination();
 
-/** 센서 및 카메라 초기화 */
+/** 1. 카메라 및 가속도 센서 켜기 */
 async function initSensors() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -138,107 +142,111 @@ async function initSensors() {
 
         window.addEventListener('devicemotion', handleMotion);
         
-        document.getElementById('status-light').className = "w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.8)]";
-        document.getElementById('motion-status').innerText = "SENSOR: ACTIVE";
-        showToast("센서 활성화됨: 스마트폰을 들고 걸으면 거리가 계산됩니다.");
+        document.getElementById('status-light').className = "w-3 h-3 rounded-full bg-green-500 shadow-[0_0_12px_rgba(34,197,94,1)]";
+        showToast("센서 활성화 완료! 폰을 들고 걷기 가능");
     } catch (err) {
-        showToast("카메라 및 센서 권한이 필요합니다.");
+        showToast("카메라/센서 권한을 허용해주세요.");
     }
 }
 
-/** 실내 발걸음 감지 (Pedometer) */
+/** 2. 발걸음 감지 시 카메라 이동 */
 function handleMotion(event) {
     if (!targetLocked) return;
 
-    // 가속도 데이터 (기기에 따라 acceleration 또는 accelerationIncludingGravity 사용)
-    let accel = event.acceleration;
-    if (!accel || accel.x === null) {
-        accel = event.accelerationIncludingGravity;
-    }
+    let accel = event.acceleration || event.accelerationIncludingGravity;
     if (!accel) return;
 
-    // x, y, z 축의 변화량 합산
     const delta = Math.abs(accel.x - lastAccel.x) + Math.abs(accel.y - lastAccel.y) + Math.abs(accel.z - lastAccel.z);
     lastAccel = { x: accel.x, y: accel.y, z: accel.z };
 
     const now = performance.now();
     
-    // 걸음이 감지되면 (delta가 임계값보다 크고, 마지막 걸음 이후 일정 시간 지났을 때)
+    // 걸음이 감지되면 (delta가 임계값을 넘고, 0.4초가 지났을 때)
     if (delta > STEP_THRESHOLD && now > stepCooldown) {
-        moveRigForward(0.4 * MOVEMENT_MULTIPLIER); // 보폭 기반 전진
-        stepCooldown = now + 400; // 0.4초 쿨다운
+        moveRigForward(STEP_DISTANCE); // 15cm 전진
+        stepCooldown = now + 400; 
         
-        // 발걸음 감지 UI 피드백
+        // UI 피드백 깜빡임
         const indicator = document.getElementById('step-indicator');
         indicator.style.opacity = '1';
         setTimeout(() => indicator.style.opacity = '0', 300);
     }
 }
 
-/** 카메라가 바라보는 방향으로 가상 위치 이동 */
+/** 3. 카메라 방향으로 전진 */
 function moveRigForward(distance) {
     const rig = document.getElementById('rig').object3D;
     const camera = document.getElementById('main-camera').object3D;
     
     let direction = new THREE.Vector3();
     camera.getWorldDirection(direction);
-    direction.y = 0; // 하늘이나 땅을 보고 걸어도 평면으로만 이동하도록 고정
+    direction.y = 0; // 하늘/땅을 봐도 평면(앞/뒤)으로만 이동
     direction.normalize();
 
+    // 현재 바라보는 방향으로 지정된 거리(15cm)만큼 이동
     rig.position.addScaledVector(direction, distance);
 }
 
-/** 화면 터치 시 카메라 렌즈 앞 50cm에 타겟 배치 */
+/** 4. 화면 터치 시 빨간 구체 허공 배치 */
 function handlePlaceSource() {
     const statusLight = document.getElementById('status-light');
     if (statusLight.classList.contains('bg-slate-600')) {
-        showToast("먼저 센서를 켜주세요.");
+        showToast("먼저 [1. 센서 활성화] 버튼을 눌러주세요.");
         return;
     }
 
     const camera = document.getElementById('main-camera').object3D;
     const sourceEl = document.getElementById('radiation-source');
 
-    // 1. 카메라의 현재 월드(World) 절대 좌표 가져오기
     let camWorldPos = new THREE.Vector3();
     camera.getWorldPosition(camWorldPos);
 
-    // 2. 카메라가 바라보는 정면 방향(Vector) 가져오기
     let camWorldDir = new THREE.Vector3();
     camera.getWorldDirection(camWorldDir);
 
-    // 3. 카메라 위치에서 정면 방향으로 0.5m(50cm) 떨어진 지점 계산
+    // 카메라 위치에서 정면(바라보는 방향)으로 정확히 0.5m(50cm) 앞 계산
     fixedSourcePos.copy(camWorldPos).add(camWorldDir.multiplyScalar(0.5));
     
-    sourceEl.object3D.position.copy(fixedSourcePos);
-    sourceEl.setAttribute('visible', 'true');
+    // setAttribute를 통해 위치를 강제 갱신하여 렌더링 보장
+    sourceEl.setAttribute('position', `${fixedSourcePos.x} ${fixedSourcePos.y} ${fixedSourcePos.z}`);
+    sourceEl.setAttribute('visible', true); // 따옴표 없이 true
 
     baseDoseAt05m = parseFloat(document.getElementById('base-dose-input').value) || 100;
     targetLocked = true;
     cumulativeDose = 0;
 
-    document.getElementById('instruction').innerText = "소스 배치 완료! 천천히 뒤로 걸어보세요.";
-    document.getElementById('instruction').className = "text-[11px] text-sky-400 font-bold mb-1";
-    showToast("전방 50cm 거리에 방사선원이 배치되었습니다.");
+    // 조준점 색상 변경
+    document.getElementById('crosshair').style.borderColor = "rgba(239, 68, 68, 0.8)";
+    
+    document.getElementById('instruction').innerText = "소스가 공중에 고정되었습니다. 가까이 가거나 멀어져 보세요.";
+    document.getElementById('instruction').className = "text-[12px] text-sky-400 font-bold mb-1";
+    showToast("눈 앞 50cm 허공에 방사선원 배치 완료!");
 }
 
+/** 5. 전체 시스템 리셋 */
 function resetSystem() {
     targetLocked = false;
     cumulativeDose = 0;
     
-    // 가상 좌표(Rig) 리셋
     const rig = document.getElementById('rig').object3D;
     rig.position.set(0, 1.6, 0); 
     
-    document.getElementById('radiation-source').setAttribute('visible', 'false');
-    document.getElementById('dose-display').innerHTML = `0.00 <span class="text-xl font-normal">mSv/h</span>`;
+    document.getElementById('radiation-source').setAttribute('visible', false);
+    document.getElementById('dose-display').innerText = `0.00`;
     document.getElementById('dist-text').innerText = "0.00 m";
-    document.getElementById('cum-text').innerText = "0.000000";
-    document.getElementById('instruction').innerText = "화면 중앙을 사물에 맞추고 터치하세요";
-    document.getElementById('instruction').className = "text-[11px] text-amber-400 font-bold mb-1 uppercase animate-pulse";
-    showToast("모든 설정이 초기화되었습니다.");
+    document.getElementById('cum-text').innerText = "0.000";
+    
+    document.getElementById('crosshair').style.borderColor = "rgba(56, 189, 248, 0.8)";
+    document.getElementById('instruction').innerText = "화면 중앙을 사물에 맞추고 화면을 터치하세요";
+    document.getElementById('instruction').className = "text-[12px] text-amber-400 font-bold mb-1 uppercase animate-pulse";
+    
+    const doseDisp = document.getElementById('dose-display');
+    doseDisp.className = "font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter";
+    
+    showToast("초기화 되었습니다.");
 }
 
+/** 6. 매 프레임 업데이트 (거리 및 선량 계산) */
 let nextTickTime = 0;
 function update() {
     const now = performance.now();
@@ -246,43 +254,46 @@ function update() {
     lastFrameTime = now;
 
     if (targetLocked) {
-        // 거리 계산의 기준점을 카메라 렌즈(현재 눈 위치)로 설정
         let currentCamPos = new THREE.Vector3();
         document.getElementById('main-camera').object3D.getWorldPosition(currentCamPos);
         
+        // 현재 내 눈 위치(카메라)와 허공에 박힌 구체 사이의 거리 계산
         let dist = currentCamPos.distanceTo(fixedSourcePos);
-        dist = Math.max(0.1, dist); // 최소 거리 0.1m 고정 (수치 폭주 방지)
+        dist = Math.max(0.05, dist); // 구체에 너무 가까워졌을 때 폭주 방지 (최소 5cm)
 
-        // 역자승 법칙 적용 (0.5m 기준 선량)
+        // 역자승 법칙 적용 (기준점 0.5m)
         const currentDoseRate = baseDoseAt05m * Math.pow(0.5 / dist, 2);
         cumulativeDose += currentDoseRate * dtHours;
 
-        // 홀로그램 텍스트 업데이트
-        document.getElementById('source-label').setAttribute('value', `SOURCE: ${baseDoseAt05m} mSv/h\nCURRENT: ${currentDoseRate.toFixed(1)} mSv/h`);
+        // 허공에 떠있는 3D 텍스트 업데이트
+        document.getElementById('source-label').setAttribute('value', `Target: 50cm\n${currentDoseRate.toFixed(1)} mSv/h`);
 
-        // HUD 업데이트
+        // 화면 UI 업데이트
         const doseDisp = document.getElementById('dose-display');
         document.getElementById('dist-text').innerText = `${dist.toFixed(2)} m`;
-        document.getElementById('cum-text').innerText = cumulativeDose.toFixed(6);
-        doseDisp.innerHTML = `${currentDoseRate.toFixed(2)} <span class="text-xl font-normal">mSv/h</span>`;
+        document.getElementById('cum-text').innerText = cumulativeDose.toFixed(4);
+        doseDisp.innerText = currentDoseRate.toFixed(2);
 
-        // 선량에 따른 색상 변화
-        if (currentDoseRate > baseDoseAt05m * 0.8) {
-            doseDisp.className = "font-orbitron text-6xl font-bold text-red-500 hazard-glow animate-pulse";
-        } else if (currentDoseRate > baseDoseAt05m * 0.3) {
-            doseDisp.className = "font-orbitron text-6xl font-bold text-yellow-400";
+        // 거리에 따른 색상 변화 (위험도 경고)
+        if (currentDoseRate > baseDoseAt05m * 1.5) {
+            // 매우 가까울 때 (빨간색 + 발광)
+            doseDisp.className = "font-orbitron text-7xl font-bold text-red-500 hazard-glow animate-pulse leading-none tracking-tighter";
+        } else if (currentDoseRate > baseDoseAt05m * 0.5) {
+            // 중간 거리 (노란색)
+            doseDisp.className = "font-orbitron text-7xl font-bold text-yellow-400 leading-none tracking-tighter";
         } else {
-            doseDisp.className = "font-orbitron text-6xl font-bold text-green-400";
+            // 안전 거리 (초록색)
+            doseDisp.className = "font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter";
         }
 
-        // 가이거 카운터 사운드
-        const tickInterval = Math.max(15, 1000 / (currentDoseRate * 0.5 + 1));
+        // 가이거 카운터 사운드 속도 조절
+        const tickInterval = Math.max(20, 1000 / (currentDoseRate * 0.5 + 1));
         if (now > nextTickTime) {
-            synth.triggerAttackRelease("16n");
+            synth.triggerAttackRelease("32n");
             nextTickTime = now + tickInterval;
         }
 
-        // 3D 텍스트가 항상 카메라를 바라보게 설정
+        // 파동 이펙트와 글씨가 항상 나를 쳐다보게 함
         document.getElementById('radiation-source').object3D.lookAt(currentCamPos);
     }
     requestAnimationFrame(update);
@@ -290,18 +301,19 @@ function update() {
 
 function showToast(m) {
     const t = document.createElement('div');
-    t.className = "fixed bottom-48 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white px-6 py-3 rounded-full z-[3000] border border-sky-500 text-xs font-bold shadow-2xl transition-all duration-300";
+    t.className = "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-900/95 text-white px-8 py-4 rounded-xl z-[3000] border border-sky-500 text-sm font-bold shadow-[0_0_20px_rgba(0,0,0,0.8)] transition-all duration-300 pointer-events-none text-center";
     t.innerText = m;
     document.body.appendChild(t);
     setTimeout(() => {
         t.style.opacity = '0';
         setTimeout(() => t.remove(), 500);
-    }, 2500);
+    }, 2000);
 }
 
 window.onload = () => update();
 </script>
 </body>
 </html>
+
 
 ```
