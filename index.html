@@ -51,7 +51,7 @@
     </p>
 </div>
 
-<!-- 2. AR 실행 중 UI 오버레이 (WebXR DOM Overlay 기술 사용) -->
+<!-- 2. AR 실행 중 UI 오버레이 -->
 <div id="ui-overlay" class="absolute inset-0 z-50 hidden" style="pointer-events: none;">
     
     <!-- 조준점 -->
@@ -80,7 +80,7 @@
         </div>
     </div>
 
-    <!-- 하단 컨트롤 버튼 (터치 가능하도록 pointer-events-auto 설정) -->
+    <!-- 하단 컨트롤 버튼 -->
     <div class="absolute bottom-8 left-1/2 -translate-x-1/2 w-[94%] max-w-lg pointer-events-auto flex gap-3">
         <button id="place-btn" class="flex-1 bg-rose-600 py-4 rounded-xl font-bold text-white shadow-lg active:scale-95 text-[14px] uppercase transition-all border border-rose-400/50">
             📍 현재 조준점에 선원 고정
@@ -97,10 +97,9 @@
     vr-mode-ui="enabled: true"
     renderer="alpha: true; antialias: true">
     
-    <!-- AR에서 실제 사용자의 스마트폰 위치를 추적할 카메라 -->
     <a-camera id="main-camera" position="0 1.6 0"></a-camera>
 
-    <!-- 배치될 방사선원 (빨간 구체) -->
+    <!-- 배치될 방사선원 -->
     <a-entity id="radiation-source" visible="false">
         <a-sphere radius="0.08" color="#ff0000" material="emissive: #ff0000; emissiveIntensity: 3"
                   animation="property: scale; from: 1 1 1; to: 1.2 1.2 1.2; dir: alternate; loop: true; dur: 500">
@@ -114,9 +113,8 @@
 </a-scene>
 
 <script>
-// --- 전역 변수 ---
 let targetLocked = false;
-let baseDoseAt1m = 100; // 기준을 1m로 설정 (실습하기 가장 좋은 기준)
+let baseDoseAt1m = 100;
 let cumulativeDose = 0;
 let lastFrameTime = performance.now();
 let sourcePosition = new THREE.Vector3();
@@ -128,7 +126,6 @@ const synth = new Tone.NoiseSynth({
 
 const sceneEl = document.querySelector('a-scene');
 
-// --- 1. 실습 시작 (AR 진입) ---
 document.getElementById('start-ar-btn').addEventListener('click', async () => {
     try {
         await Tone.start();
@@ -136,7 +133,7 @@ document.getElementById('start-ar-btn').addEventListener('click', async () => {
         
         const enterARBtn = document.querySelector('.a-enter-ar-button');
         if (enterARBtn) {
-            enterARBtn.click(); // WebXR 세션 시작
+            enterARBtn.click();
         } else {
             alert("기기 또는 브라우저가 공간 인식(WebXR)을 지원하지 않습니다. 최신 안드로이드 스마트폰의 크롬 브라우저를 사용해주세요.");
         }
@@ -145,7 +142,6 @@ document.getElementById('start-ar-btn').addEventListener('click', async () => {
     }
 });
 
-// AR 모드에 정상 진입했을 때 UI 전환
 sceneEl.addEventListener('enter-vr', () => {
     if (sceneEl.is('ar-mode')) {
         document.getElementById('intro-screen').style.display = 'none';
@@ -155,36 +151,28 @@ sceneEl.addEventListener('enter-vr', () => {
     }
 });
 
-// AR 모드 종료 시 리셋
 sceneEl.addEventListener('exit-vr', () => {
     document.getElementById('intro-screen').style.display = 'flex';
     document.getElementById('ui-overlay').style.display = 'none';
     resetSystem();
 });
 
-// --- 2. 선원 물리적 공간에 배치 ---
+// --- 2. 선원을 등 뒤가 아닌 무조건 '카메라 정면 앞'에 배치하도록 수정 ---
 document.getElementById('place-btn').addEventListener('click', () => {
     const camera = document.getElementById('main-camera').object3D;
     const sourceEl = document.getElementById('radiation-source');
 
-    // 스마트폰 카메라의 현재 물리적 위치와 바라보는 방향 계산
-    let camWorldPos = new THREE.Vector3();
-    camera.getWorldPosition(camWorldPos);
-    let camWorldDir = new THREE.Vector3();
-    camera.getWorldDirection(camWorldDir);
-
-    // 카메라 정면 방향으로 정확히 1m 앞의 '현실 공간 좌표'를 계산하여 고정
-    sourcePosition.copy(camWorldPos).add(camWorldDir.multiplyScalar(1.0));
+    // ★ 수정된 핵심 로직: 카메라 렌즈 기준 앞쪽(0, 0, -1)을 정확한 3D 월드 좌표로 변환
+    sourcePosition.set(0, 0, -1);
+    camera.localToWorld(sourcePosition);
     
     // AR 씬에 렌더링
     sourceEl.setAttribute('position', `${sourcePosition.x} ${sourcePosition.y} ${sourcePosition.z}`);
     sourceEl.setAttribute('visible', 'true');
 
-    // 상태 업데이트
     targetLocked = true;
     cumulativeDose = 0;
     
-    // UI 변경
     document.getElementById('place-btn').classList.add('hidden');
     document.getElementById('reset-btn').classList.remove('hidden');
     document.getElementById('crosshair').style.display = 'none';
@@ -194,13 +182,11 @@ document.getElementById('place-btn').addEventListener('click', () => {
     statusMsg.className = "text-[12px] text-sky-400 font-bold";
 });
 
-// --- 3. 초기화 (다시 배치) ---
 function resetSystem() {
     targetLocked = false;
     cumulativeDose = 0;
     document.getElementById('radiation-source').setAttribute('visible', 'false');
     
-    // UI 초기화
     document.getElementById('place-btn').classList.remove('hidden');
     document.getElementById('reset-btn').classList.add('hidden');
     document.getElementById('crosshair').style.display = 'block';
@@ -217,31 +203,24 @@ function resetSystem() {
 }
 document.getElementById('reset-btn').addEventListener('click', resetSystem);
 
-// --- 4. 실시간 위치 추적 및 선량 계산 (초당 60프레임) ---
 let nextTickTime = 0;
 function update() {
-    // AR 모드이고 선원이 배치되었을 때만 계산
     if (targetLocked && sceneEl.is('ar-mode')) {
         const now = performance.now();
         const dtHours = (now - lastFrameTime) / 3600000;
         lastFrameTime = now;
 
-        // 사용자가 실제로 걸어다니면 스마트폰 하드웨어가 이 위치(currentCamPos)를 자동으로 갱신함
         let currentCamPos = new THREE.Vector3();
         document.getElementById('main-camera').object3D.getWorldPosition(currentCamPos);
         
-        // 내 스마트폰과 허공에 고정된 선원 사이의 실제 물리적 거리 계산
         let dist = currentCamPos.distanceTo(sourcePosition);
         
-        // 기준 거리인 1m에 가까울 경우 수치를 깔끔하게 보정, 너무 가까울 때 폭발 방지
         if (Math.abs(dist - 1.0) < 0.05) dist = 1.0;
         dist = Math.max(0.1, dist);
 
-        // 역자승 법칙 (이번엔 계산하기 쉽게 1m 기준을 사용)
         const currentDoseRate = baseDoseAt1m * Math.pow(1.0 / dist, 2);
         cumulativeDose += currentDoseRate * dtHours;
 
-        // UI 갱신
         document.getElementById('source-label').setAttribute('value', `Target: 1m\n${currentDoseRate.toFixed(1)} mSv/h`);
         
         const doseDisp = document.getElementById('dose-display');
@@ -249,7 +228,6 @@ function update() {
         document.getElementById('cum-text').innerText = cumulativeDose.toFixed(4);
         doseDisp.innerText = currentDoseRate.toFixed(2);
 
-        // 거리에 따른 위험 경고 색상
         if (currentDoseRate > baseDoseAt1m * 1.5) {
             doseDisp.className = "font-orbitron text-7xl font-bold text-red-500 hazard-glow leading-none tracking-tighter";
         } else if (currentDoseRate > baseDoseAt1m * 0.5) {
@@ -258,7 +236,6 @@ function update() {
             doseDisp.className = "font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter";
         }
 
-        // 가이거 카운터 소리 (선량 비례)
         const tickInterval = Math.max(20, 1000 / (currentDoseRate * 0.5 + 1));
         if (now > nextTickTime) {
             synth.triggerAttackRelease("32n");
@@ -272,10 +249,10 @@ function update() {
     requestAnimationFrame(update);
 }
 
-// 렌더링 루프 시작
 update();
 </script>
 </body>
 </html>
+
 
 ```
