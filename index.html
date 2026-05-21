@@ -32,7 +32,6 @@
     <p class="text-sky-400 font-bold mb-6 text-center text-sm">도보/가상 이동 + 차폐 시뮬레이션</p>
     
     <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 mb-8 max-w-sm text-center shadow-xl w-full">
-        <!-- 방사선 종류 선택은 AR 화면 안으로 이동하고, 선량 크기만 입력받음 -->
         <label class="text-[12px] text-slate-400 uppercase font-bold block mb-3">실습 기준 선량 (1m 거리 기준)</label>
         <div class="flex items-center justify-center gap-2">
             <input type="number" id="base-dose-input" value="100" class="w-28 bg-slate-900 border border-slate-600 rounded-lg py-3 px-2 text-white text-center font-orbitron text-2xl focus:border-sky-500 outline-none">
@@ -91,7 +90,7 @@
     <!-- 하단 컨트롤 버튼 (배치 + 차폐 + 방사선 종류) -->
     <div class="absolute bottom-8 left-1/2 -translate-x-1/2 w-[94%] max-w-lg pointer-events-auto flex flex-col gap-2">
         
-        <!-- [신규 구조] 차폐체 및 방사선 종류 선택 패널 (선원 배치 후 나타남) -->
+        <!-- 차폐체 및 방사선 종류 선택 패널 -->
         <div id="shield-controls" class="flex-col gap-2 hidden w-full">
             <div class="flex gap-2 w-full">
                 <!-- 실시간 방사선 종류 변경 -->
@@ -108,7 +107,6 @@
                     <option value="lead">납 (Lead)</option>
                 </select>
             </div>
-            <!-- 거리 1m로 텍스트 변경 -->
             <button id="shield-btn" class="w-full bg-indigo-600 py-3 rounded-xl font-bold text-white shadow-lg active:scale-95 text-[13px] uppercase transition-all">
                 🛡️ 선택한 차폐체를 1m 앞에 설치/변경
             </button>
@@ -145,12 +143,12 @@
         </a-ring>
     </a-entity>
 
-    <!-- [수정] 차폐체 (2D a-plane에서 볼륨감 있는 3D a-box로 변경) -->
+    <!-- [수정됨] 차폐체 크기 대폭 축소 (입체감 확보) -->
+    <!-- 넓이를 0.6m, 높이를 0.8m로 줄여서 확실한 '블록(장애물)' 형태가 되도록 설정 -->
     <a-entity id="shield-object" visible="false">
-        <!-- 두께(depth) 0.15m 추가하여 입체감 형성 -->
-        <a-box width="1.2" height="1.5" depth="0.15" color="#ffffff" material="opacity: 0.92; transparent: true"></a-box>
-        <!-- 텍스트 위치를 박스 앞면으로 약간 당김 -->
-        <a-text id="shield-label" value="SHIELD" align="center" position="0 0.8 0.08" color="#ffffff" scale="0.6 0.6 0.6"></a-text>
+        <a-box width="0.6" height="0.8" depth="0.1" color="#ffffff" material="opacity: 0.95; transparent: true"></a-box>
+        <!-- 라벨 위치도 박스 크기에 맞춰 중앙 상단으로 조절 -->
+        <a-text id="shield-label" value="SHIELD" align="center" position="0 0.45 0.06" color="#ffffff" scale="0.5 0.5 0.5"></a-text>
     </a-entity>
 </a-scene>
 
@@ -230,7 +228,6 @@ document.getElementById('place-btn').addEventListener('click', () => {
     document.getElementById('place-btn').classList.add('hidden');
     document.getElementById('reset-btn').classList.remove('hidden');
     
-    // 차폐체 및 방사선 제어 패널 보이기
     document.getElementById('shield-controls').classList.remove('hidden');
     document.getElementById('shield-controls').classList.add('flex');
     
@@ -248,14 +245,14 @@ document.getElementById('live-rad-type').addEventListener('change', (e) => {
     showToast(`방사선이 [ ${types[e.target.value]} ] 으로 변경되었습니다.`);
 });
 
-// 셀렉트 박스에서 차폐체 선택 시, 바로 적용 버튼이 눌린 것과 동일한 효과
+// 차폐체 자동 반영
 document.getElementById('shield-type').addEventListener('change', () => {
     if(shieldActive || document.getElementById('shield-type').value !== 'none') {
         document.getElementById('shield-btn').click();
     }
 });
 
-// 3. 차폐체 배치 (1m 앞) 및 입체 박스 색상 변경
+// 3. 차폐체 배치 (1m 앞, 작아진 3D 박스 형태)
 document.getElementById('shield-btn').addEventListener('click', () => {
     shieldMaterial = document.getElementById('shield-type').value;
     const sObj = document.getElementById('shield-object');
@@ -269,7 +266,7 @@ document.getElementById('shield-btn').addEventListener('click', () => {
     
     const camera = document.getElementById('main-camera').object3D;
     
-    // [수정] 차폐체를 카메라 정면 1m에 배치
+    // 차폐체를 카메라 정면 1m에 배치
     shieldPosition.set(0, 0, -1);
     camera.localToWorld(shieldPosition);
     
@@ -277,24 +274,24 @@ document.getElementById('shield-btn').addEventListener('click', () => {
     sObj.setAttribute('visible', 'true');
     shieldActive = true;
     
-    // [수정] 차폐체 종류에 따른 짙고 무거운 색상 반영 (a-box 대상)
+    // 짙고 무거운 색상 적용
     const box = sObj.querySelector('a-box');
     const label = sObj.querySelector('a-text');
     if(shieldMaterial === 'paper') { 
-        box.setAttribute('color', '#b45309'); // 짙은 황토/갈색 (두꺼운 박스/종이 느낌)
+        box.setAttribute('color', '#b45309'); // 짙은 황토/갈색
         label.setAttribute('value', 'PAPER'); 
     }
     if(shieldMaterial === 'plastic') { 
-        box.setAttribute('color', '#1e3a8a'); // 짙은 네이비/파란색
+        box.setAttribute('color', '#1e3a8a'); // 짙은 네이비
         label.setAttribute('value', 'PLASTIC'); 
     }
     if(shieldMaterial === 'lead') { 
-        box.setAttribute('color', '#334155'); // 짙은 다크 그레이(납 느낌)
+        box.setAttribute('color', '#334155'); // 짙은 다크 그레이
         label.setAttribute('value', 'LEAD'); 
     }
     
     sObj.object3D.lookAt(camera.position); 
-    showToast("1m 앞에 선택한 차폐체가 설치되었습니다!");
+    showToast("1m 앞에 짙은 차폐체 벽돌이 설치되었습니다!");
 });
 
 // 4. 가상 이동 (버튼)
@@ -359,10 +356,9 @@ function update() {
         let dist = currentCamPos.distanceTo(sourcePosition);
         dist = Math.max(0.1, dist);
 
-        // 1m 거리 기준 역자승 법칙 계산
         let currentDoseRate = baseDoseAt1m * Math.pow(1.0 / dist, 2);
 
-        // 차폐 효과 적용 로직
+        // 차폐 효과 적용
         if (shieldActive) {
             let currentRadType = document.getElementById('live-rad-type').value;
 
@@ -370,10 +366,10 @@ function update() {
             let camToSource = currentCamPos.distanceTo(sourcePosition);
             let sourceToShield = sourcePosition.distanceTo(shieldPosition);
             
-            // 사용자와 선원 사이의 거리가, (사용자-차폐체) 및 (선원-차폐체) 거리보다 둘 다 길어야 차폐체 뒤에 숨어있는 것으로 간주
+            // 차폐체가 사용자와 선원 사이에 정확히 있는지 확인
             if (camToShield < camToSource && sourceToShield < camToSource) {
                 const factor = shieldingData[currentRadType][shieldMaterial];
-                currentDoseRate *= factor; // 투과율 곱하기
+                currentDoseRate *= factor; 
             }
         }
 
@@ -386,7 +382,7 @@ function update() {
         document.getElementById('cum-text').innerText = cumulativeDose.toFixed(4);
         doseDisp.innerText = currentDoseRate.toFixed(2);
 
-        // 선량 크기에 따른 시각적 경고
+        // 색상 변화 시각적 경고
         if (currentDoseRate > baseDoseAt1m * 1.5) {
             doseDisp.className = "font-orbitron text-7xl font-bold text-red-500 hazard-glow leading-none tracking-tighter";
         } else if (currentDoseRate > baseDoseAt1m * 0.5) {
