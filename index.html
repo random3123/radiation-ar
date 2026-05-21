@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -131,7 +132,8 @@
         <a-sphere radius="0.1" color="#ff0000" material="emissive: #ff0000; emissiveIntensity: 3"
                   animation="property: scale; from: 1 1 1; to: 1.2 1.2 1.2; dir: alternate; loop: true; dur: 500">
         </a-sphere>
-        <a-text id="source-label" value="SOURCE" align="center" position="0 0.35 0" color="#ff4444" scale="0.6 0.6 0.6"></a-text>
+        <!-- 글씨 내용을 빈칸으로 초기화, js에서 덮어씌움 -->
+        <a-text id="source-label" value="" align="center" position="0 0.35 0" color="#ff4444" scale="0.6 0.6 0.6"></a-text>
         <a-ring radius-inner="0.13" radius-outer="0.17" color="#ff0000" material="opacity: 0.8; side: double"
                 animation__scale="property: scale; from: 1 1 1; to: 5 5 5; loop: true; dur: 1500; easing: linear"
                 animation__opacity="property: material.opacity; from: 0.8; to: 0; loop: true; dur: 1500; easing: linear">
@@ -203,6 +205,10 @@ document.getElementById('place-btn').addEventListener('click', () => {
     camera.localToWorld(sourcePosition);
     document.getElementById('radiation-source').setAttribute('position', `${sourcePosition.x} ${sourcePosition.y} ${sourcePosition.z}`);
     document.getElementById('radiation-source').setAttribute('visible', 'true');
+    
+    // [핵심 변경] 선원 위에 '처음 지정한 선량 크기'만 깔끔하게 출력
+    document.getElementById('source-label').setAttribute('value', `${baseDoseAt1m} mSv/h`);
+    
     targetLocked = true;
     document.getElementById('place-btn').classList.add('hidden');
     document.getElementById('reset-btn').classList.remove('hidden');
@@ -291,6 +297,8 @@ function update() {
         document.getElementById('dose-display').innerText = currentDoseRate.toFixed(2);
         document.getElementById('dist-text').innerHTML = `${dist.toFixed(2)} <span class="text-sm">m</span>`;
         document.getElementById('cum-text').innerText = cumulativeDose.toFixed(4);
+
+        // UI에만 실시간 선량 반영, 선원 위 라벨은 건드리지 않음
         document.getElementById('radiation-source').object3D.lookAt(currentCamPos);
     }
     requestAnimationFrame(update);
@@ -301,10 +309,16 @@ function showToast(msg) {
     t.className = "fixed top-[30%] left-1/2 -translate-x-1/2 bg-slate-900/95 text-white px-6 py-3 rounded-xl z-[3000] border border-sky-500 text-[13px] font-bold shadow-[0_0_20px_rgba(0,0,0,0.8)] transition-all duration-300 pointer-events-none text-center whitespace-nowrap";
     t.innerText = msg;
     document.getElementById('ui-overlay').appendChild(t);
-    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 500); }, 2000);
+    setTimeout(() => {
+        t.style.opacity = '0';
+        setTimeout(() => t.remove(), 500);
+    }, 2000);
 }
 
 update();
 </script>
 </body>
 </html>
+
+
+```
