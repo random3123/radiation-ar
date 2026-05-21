@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -54,6 +55,7 @@
     <div class="absolute top-4 left-1/2 -translate-x-1/2 w-[94%] max-w-lg glass rounded-2xl p-4">
         <div class="flex justify-between items-center mb-1">
             <span id="status-msg" class="text-[12px] text-amber-400 font-bold animate-pulse">원하는 위치를 조준하고 배치하세요</span>
+            <span id="rad-type-badge" class="text-[10px] bg-red-600 px-2 py-1 rounded text-white font-bold uppercase"></span>
         </div>
         
         <div class="text-center py-1">
@@ -93,21 +95,22 @@
         <div id="shield-controls" class="flex-col gap-2 hidden w-full">
             <div class="flex gap-2 w-full">
                 <!-- 실시간 방사선 종류 변경 -->
-                <select id="live-rad-type" class="flex-1 bg-slate-800 text-amber-400 p-3 rounded-xl border border-slate-600 font-bold outline-none text-[13px] text-center text-center">
+                <select id="live-rad-type" class="flex-1 bg-slate-800 text-amber-400 p-3 rounded-xl border border-slate-600 font-bold outline-none text-[13px] text-center">
                     <option value="alpha">알파선 (α)</option>
                     <option value="beta">베타선 (β)</option>
                     <option value="gamma">감마선 (γ)</option>
                 </select>
                 <!-- 실시간 차폐체 변경 -->
-                <select id="shield-type" class="flex-1 bg-slate-800 text-sky-300 p-3 rounded-xl border border-slate-600 font-bold outline-none text-[13px] text-center text-center">
+                <select id="shield-type" class="flex-1 bg-slate-800 text-sky-300 p-3 rounded-xl border border-slate-600 font-bold outline-none text-[13px] text-center">
                     <option value="none">차폐체 없음</option>
                     <option value="paper">종이 (Paper)</option>
                     <option value="plastic">플라스틱 (Plastic)</option>
                     <option value="lead">납 (Lead)</option>
                 </select>
             </div>
+            <!-- 거리 1m로 텍스트 변경 -->
             <button id="shield-btn" class="w-full bg-indigo-600 py-3 rounded-xl font-bold text-white shadow-lg active:scale-95 text-[13px] uppercase transition-all">
-                🛡️ 선택한 차폐체를 2m 앞에 설치/변경
+                🛡️ 선택한 차폐체를 1m 앞에 설치/변경
             </button>
         </div>
 
@@ -142,10 +145,12 @@
         </a-ring>
     </a-entity>
 
-    <!-- 차폐체 (반투명 벽) -->
+    <!-- [수정] 차폐체 (2D a-plane에서 볼륨감 있는 3D a-box로 변경) -->
     <a-entity id="shield-object" visible="false">
-        <a-plane width="1.2" height="1.5" color="#ffffff" material="opacity: 0.5; transparent: true; side: double"></a-plane>
-        <a-text id="shield-label" value="SHIELD" align="center" position="0 0.8 0" color="#ffffff" scale="0.6 0.6 0.6"></a-text>
+        <!-- 두께(depth) 0.15m 추가하여 입체감 형성 -->
+        <a-box width="1.2" height="1.5" depth="0.15" color="#ffffff" material="opacity: 0.92; transparent: true"></a-box>
+        <!-- 텍스트 위치를 박스 앞면으로 약간 당김 -->
+        <a-text id="shield-label" value="SHIELD" align="center" position="0 0.8 0.08" color="#ffffff" scale="0.6 0.6 0.6"></a-text>
     </a-entity>
 </a-scene>
 
@@ -157,18 +162,15 @@ let cumulativeDose = 0;
 let lastFrameTime = performance.now();
 let sourcePosition = new THREE.Vector3();
 
-// [신규] 차폐 관련 변수
+// 차폐 관련 변수
 let shieldActive = false;
 let shieldMaterial = 'none';
 let shieldPosition = new THREE.Vector3();
 
-// [완벽 교정] 물리적 투과율 데이터 (1.0 = 100% 통과, 0.0 = 완벽 차폐)
+// 물리적 투과율 데이터 (1.0 = 100% 통과, 0.0 = 완벽 차폐)
 const shieldingData = {
-    // 알파선: 종이, 플라스틱, 납 모두에 의해 완벽하게 차단됨
     alpha: { none: 1.0, paper: 0.00, plastic: 0.00, lead: 0.00 },
-    // 베타선: 종이는 그냥 통과하지만 플라스틱, 납에는 완벽하게 차단됨
     beta:  { none: 1.0, paper: 1.00, plastic: 0.00, lead: 0.00 },
-    // 감마선: 종이, 플라스틱은 통과하고 납으로만 감쇠됨 (예시로 90% 차단, 10% 통과로 설정)
     gamma: { none: 1.0, paper: 1.00, plastic: 1.00, lead: 0.10 }  
 };
 
@@ -240,7 +242,7 @@ document.getElementById('place-btn').addEventListener('click', () => {
     statusMsg.className = "text-[12px] text-sky-400 font-bold";
 });
 
-// 방사선 종류 변경 시 알림 (자동 계산은 실시간 루프에서 처리)
+// 방사선 종류 변경 시 알림
 document.getElementById('live-rad-type').addEventListener('change', (e) => {
     const types = { alpha: "알파선(α)", beta: "베타선(β)", gamma: "감마선(γ)" };
     showToast(`방사선이 [ ${types[e.target.value]} ] 으로 변경되었습니다.`);
@@ -253,7 +255,7 @@ document.getElementById('shield-type').addEventListener('change', () => {
     }
 });
 
-// 3. 차폐체 배치 (2m 앞) 및 종류 변경 적용
+// 3. 차폐체 배치 (1m 앞) 및 입체 박스 색상 변경
 document.getElementById('shield-btn').addEventListener('click', () => {
     shieldMaterial = document.getElementById('shield-type').value;
     const sObj = document.getElementById('shield-object');
@@ -267,32 +269,32 @@ document.getElementById('shield-btn').addEventListener('click', () => {
     
     const camera = document.getElementById('main-camera').object3D;
     
-    // 차폐체를 카메라 정면 2m에 배치
-    shieldPosition.set(0, 0, -2);
+    // [수정] 차폐체를 카메라 정면 1m에 배치
+    shieldPosition.set(0, 0, -1);
     camera.localToWorld(shieldPosition);
     
     sObj.setAttribute('position', `${shieldPosition.x} ${shieldPosition.y} ${shieldPosition.z}`);
     sObj.setAttribute('visible', 'true');
     shieldActive = true;
     
-    // 차폐체 종류에 따른 시각적 변화
-    const plane = sObj.querySelector('a-plane');
+    // [수정] 차폐체 종류에 따른 짙고 무거운 색상 반영 (a-box 대상)
+    const box = sObj.querySelector('a-box');
     const label = sObj.querySelector('a-text');
     if(shieldMaterial === 'paper') { 
-        plane.setAttribute('color', '#fcd34d'); // 노란색(종이)
+        box.setAttribute('color', '#b45309'); // 짙은 황토/갈색 (두꺼운 박스/종이 느낌)
         label.setAttribute('value', 'PAPER'); 
     }
     if(shieldMaterial === 'plastic') { 
-        plane.setAttribute('color', '#38bdf8'); // 파란색(플라스틱)
+        box.setAttribute('color', '#1e3a8a'); // 짙은 네이비/파란색
         label.setAttribute('value', 'PLASTIC'); 
     }
     if(shieldMaterial === 'lead') { 
-        plane.setAttribute('color', '#94a3b8'); // 회색(납)
+        box.setAttribute('color', '#334155'); // 짙은 다크 그레이(납 느낌)
         label.setAttribute('value', 'LEAD'); 
     }
     
     sObj.object3D.lookAt(camera.position); 
-    showToast("2m 앞에 선택한 차폐체가 설치되었습니다!");
+    showToast("1m 앞에 선택한 차폐체가 설치되었습니다!");
 });
 
 // 4. 가상 이동 (버튼)
@@ -360,9 +362,8 @@ function update() {
         // 1m 거리 기준 역자승 법칙 계산
         let currentDoseRate = baseDoseAt1m * Math.pow(1.0 / dist, 2);
 
-        // [핵심] 차폐 효과 적용 로직
+        // 차폐 효과 적용 로직
         if (shieldActive) {
-            // 현재 선택된 방사선 종류 실시간 확인
             let currentRadType = document.getElementById('live-rad-type').value;
 
             let camToShield = currentCamPos.distanceTo(shieldPosition);
@@ -391,13 +392,13 @@ function update() {
         } else if (currentDoseRate > baseDoseAt1m * 0.5) {
             doseDisp.className = "font-orbitron text-7xl font-bold text-yellow-400 leading-none tracking-tighter";
         } else if (currentDoseRate === 0) {
-            doseDisp.className = "font-orbitron text-7xl font-bold text-slate-500 leading-none tracking-tighter"; // 완벽 차폐시 회색
+            doseDisp.className = "font-orbitron text-7xl font-bold text-slate-500 leading-none tracking-tighter"; 
         } else {
             doseDisp.className = "font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter";
         }
 
         const tickInterval = Math.max(20, 1000 / (currentDoseRate * 0.5 + 1));
-        if (now > nextTickTime && currentDoseRate > 0) { // 선량이 0이면 소리 안남
+        if (now > nextTickTime && currentDoseRate > 0) {
             synth.triggerAttackRelease("32n");
             nextTickTime = now + tickInterval;
         }
@@ -423,3 +424,5 @@ update();
 </script>
 </body>
 </html>
+
+```
