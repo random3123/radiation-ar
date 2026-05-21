@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -202,6 +203,10 @@ document.getElementById('place-btn').addEventListener('click', () => {
     sourcePosition.set(0, 0, -3);
     camera.localToWorld(sourcePosition);
     document.getElementById('radiation-source').setAttribute('position', `${sourcePosition.x} ${sourcePosition.y} ${sourcePosition.z}`);
+    
+    // [수정사항] 라벨을 최초 지정한 선량 크기만 나오게 변경 (다른 수식어 없음)
+    document.getElementById('source-label').setAttribute('value', `${baseDoseAt1m} mSv/h`);
+    
     document.getElementById('radiation-source').setAttribute('visible', 'true');
     targetLocked = true;
     document.getElementById('place-btn').classList.add('hidden');
@@ -291,6 +296,23 @@ function update() {
         document.getElementById('dose-display').innerText = currentDoseRate.toFixed(2);
         document.getElementById('dist-text').innerHTML = `${dist.toFixed(2)} <span class="text-sm">m</span>`;
         document.getElementById('cum-text').innerText = cumulativeDose.toFixed(4);
+
+        if (currentDoseRate > baseDoseAt1m * 1.5) {
+            document.getElementById('dose-display').className = "font-orbitron text-7xl font-bold text-red-500 hazard-glow leading-none tracking-tighter";
+        } else if (currentDoseRate > baseDoseAt1m * 0.5) {
+            document.getElementById('dose-display').className = "font-orbitron text-7xl font-bold text-yellow-400 leading-none tracking-tighter";
+        } else if (currentDoseRate === 0) {
+            document.getElementById('dose-display').className = "font-orbitron text-7xl font-bold text-slate-500 leading-none tracking-tighter";
+        } else {
+            document.getElementById('dose-display').className = "font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter";
+        }
+
+        const tickInterval = Math.max(20, 1000 / (currentDoseRate * 0.5 + 1));
+        if (now > nextTickTime && currentDoseRate > 0) {
+            synth.triggerAttackRelease("32n");
+            nextTickTime = now + tickInterval;
+        }
+
         document.getElementById('radiation-source').object3D.lookAt(currentCamPos);
     }
     requestAnimationFrame(update);
@@ -301,10 +323,16 @@ function showToast(msg) {
     t.className = "fixed top-[30%] left-1/2 -translate-x-1/2 bg-slate-900/95 text-white px-6 py-3 rounded-xl z-[3000] border border-sky-500 text-[13px] font-bold shadow-[0_0_20px_rgba(0,0,0,0.8)] transition-all duration-300 pointer-events-none text-center whitespace-nowrap";
     t.innerText = msg;
     document.getElementById('ui-overlay').appendChild(t);
-    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 500); }, 2000);
+    setTimeout(() => {
+        t.style.opacity = '0';
+        setTimeout(() => t.remove(), 500);
+    }, 2000);
 }
 
 update();
 </script>
 </body>
 </html>
+
+
+```
