@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -22,7 +23,6 @@
 </head>
 <body>
 
-<!-- 1. 앱 시작 인트로 화면 -->
 <div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-900 px-6">
     <div class="w-20 h-20 bg-sky-500 rounded-full flex items-center justify-center mb-4 shadow-[0_0_40px_rgba(14,165,233,0.6)]">
         <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
@@ -44,12 +44,10 @@
     </button>
 </div>
 
-<!-- 2. AR 실행 중 UI 오버레이 -->
 <div id="ui-overlay" class="absolute inset-0 z-50 hidden" style="pointer-events: none;">
     
     <div id="crosshair"></div>
 
-    <!-- 상단 HUD -->
     <div class="absolute top-4 left-1/2 -translate-x-1/2 w-[94%] max-w-lg glass rounded-2xl p-4">
         <div class="flex justify-between items-center mb-1">
             <span id="status-msg" class="text-[12px] text-amber-400 font-bold animate-pulse">원하는 위치를 조준하고 배치하세요</span>
@@ -73,7 +71,6 @@
         </div>
     </div>
 
-    <!-- 가상 이동 버튼 패널 -->
     <div id="manual-controls" class="absolute right-4 top-1/2 -translate-y-1/2 flex-col gap-3 pointer-events-auto hidden">
         <div class="glass p-3 rounded-2xl flex flex-col items-center gap-3 border border-sky-500/30">
             <span class="text-[10px] text-sky-300 font-bold tracking-widest text-center">가상<br>이동</span>
@@ -86,7 +83,6 @@
         </div>
     </div>
 
-    <!-- 하단 컨트롤 버튼 -->
     <div class="absolute bottom-8 left-1/2 -translate-x-1/2 w-[94%] max-w-lg pointer-events-auto flex flex-col gap-2">
         <div id="shield-controls" class="flex-col gap-2 hidden w-full">
             <div class="flex gap-2 w-full">
@@ -118,7 +114,6 @@
     </div>
 </div>
 
-<!-- 3. WebXR AR 공간 환경 설정 -->
 <a-scene 
     webxr="optionalFeatures: dom-overlay; overlayElement: #ui-overlay"
     vr-mode-ui="enabled: true"
@@ -126,20 +121,17 @@
     
     <a-camera id="main-camera" position="0 1.6 0"></a-camera>
 
-    <!-- 방사선원 -->
     <a-entity id="radiation-source" visible="false">
         <a-sphere radius="0.1" color="#ff0000" material="emissive: #ff0000; emissiveIntensity: 3"
                   animation="property: scale; from: 1 1 1; to: 1.2 1.2 1.2; dir: alternate; loop: true; dur: 500">
         </a-sphere>
-        <!-- 라벨 내용 수정 -->
-        <a-text id="source-label" value="LOADING..." align="center" position="0 0.45 0" color="#ff4444" scale="0.6 0.6 0.6"></a-text>
+        <a-text id="source-label" value="LOADING..." align="center" position="0 0.35 0" color="#ff4444" scale="0.6 0.6 0.6"></a-text>
         <a-ring radius-inner="0.13" radius-outer="0.17" color="#ff0000" material="opacity: 0.8; side: double"
                 animation__scale="property: scale; from: 1 1 1; to: 5 5 5; loop: true; dur: 1500; easing: linear"
                 animation__opacity="property: material.opacity; from: 0.8; to: 0; loop: true; dur: 1500; easing: linear">
         </a-ring>
     </a-entity>
 
-    <!-- 차폐체 -->
     <a-entity id="shield-object" visible="false">
         <a-box width="0.3" height="0.5" depth="0.2" color="#ffffff" material="opacity: 0.95; transparent: true"></a-box>
         <a-text id="shield-label" value="SHIELD" align="center" position="0 0 0.11" color="#ffffff" scale="0.35 0.35 0.35"></a-text>
@@ -193,6 +185,10 @@ document.getElementById('place-btn').addEventListener('click', () => {
     document.getElementById('radiation-source').setAttribute('position', `${sourcePosition.x} ${sourcePosition.y} ${sourcePosition.z}`);
     document.getElementById('radiation-source').setAttribute('visible', 'true');
     targetLocked = true;
+    
+    // [수정사항] 배치 시점에 사용자가 설정한 기준 선량(BASE) 텍스트만 라벨에 한 번 고정 표기
+    document.getElementById('source-label').setAttribute('value', `BASE: ${baseDoseAt1m} mSv/h`);
+
     document.getElementById('place-btn').classList.add('hidden');
     document.getElementById('reset-btn').classList.remove('hidden');
     document.getElementById('shield-controls').classList.remove('hidden');
@@ -252,6 +248,7 @@ function update() {
         const now = performance.now();
         const dtHours = (now - lastFrameTime) / 3600000;
         lastFrameTime = now;
+
         let currentCamPos = new THREE.Vector3();
         document.getElementById('main-camera').object3D.getWorldPosition(currentCamPos);
         let dist = Math.max(0.1, currentCamPos.distanceTo(sourcePosition));
@@ -262,20 +259,21 @@ function update() {
             let camToShield = currentCamPos.distanceTo(shieldPosition);
             let camToSource = currentCamPos.distanceTo(sourcePosition);
             let sourceToShield = sourcePosition.distanceTo(shieldPosition);
+            
             if (camToShield < camToSource && sourceToShield < camToSource) {
                 currentDoseRate *= shieldingData[currentRadType][shieldMaterial]; 
             }
         }
 
         cumulativeDose += currentDoseRate * dtHours;
-        // [수정사항] 라벨에 기준 선량(BASE)과 현재 선량(NOW)을 함께 표시
-        document.getElementById('source-label').setAttribute('value', `BASE: ${baseDoseAt1m} mSv/h\nNOW: ${currentDoseRate.toFixed(1)} mSv/h`);
+        
+        // [수정사항] 업데이트 루프 내에서 소스 라벨의 실시간 값 변경 구문을 완전히 삭제하였습니다.
+        // 선량 정보는 상단 HUD를 통해서만 갱신됩니다.
         
         document.getElementById('dose-display').innerText = currentDoseRate.toFixed(2);
         document.getElementById('dist-text').innerHTML = `${dist.toFixed(2)} <span class="text-sm">m</span>`;
         document.getElementById('cum-text').innerText = cumulativeDose.toFixed(4);
-        
-        // 경고 색상 로직 유지
+
         if (currentDoseRate > baseDoseAt1m * 1.5) document.getElementById('dose-display').className = "font-orbitron text-7xl font-bold text-red-500 hazard-glow leading-none tracking-tighter";
         else if (currentDoseRate > baseDoseAt1m * 0.5) document.getElementById('dose-display').className = "font-orbitron text-7xl font-bold text-yellow-400 leading-none tracking-tighter";
         else if (currentDoseRate === 0) document.getElementById('dose-display').className = "font-orbitron text-7xl font-bold text-slate-500 leading-none tracking-tighter";
@@ -295,7 +293,10 @@ function showToast(msg) {
     document.getElementById('ui-overlay').appendChild(t);
     setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 500); }, 2000);
 }
+
 update();
 </script>
 </body>
 </html>
+
+```
