@@ -17,12 +17,13 @@
         #crosshair { position: fixed; top: 50%; left: 50%; width: 24px; height: 24px; border: 2px solid rgba(255, 255, 255, 0.8); border-radius: 50%; transform: translate(-50%, -50%); z-index: 1000; pointer-events: none; display: none; }
         #crosshair::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: white; border-radius: 50%; transform: translate(-50%, -50%); }
 
-        .a-enter-vr { display: none !important; }
+        /* A-Frame 기본 AR/VR 진입 사각버튼 화면에서 완전히 숨기기 */
+        .a-enter-vr, .a-enter-ar, .a-enter-ar-button, .a-enter-vr-button { display: none !important; }
     </style>
 </head>
 <body>
 
-<!-- 1. 앱 시작 인트로 화면 -->
+<!-- 1. 앱 시작 인트로 화면 (background5.png 로 변경) -->
 <div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center px-6" style="background: url('background5.png') center/cover no-repeat;">
     
     <!-- 전체 요소를 화면 중앙에서 30px 더 아래로(총 150px) 이동 -->
