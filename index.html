@@ -307,8 +307,8 @@ function update() {
         document.getElementById('dist-text').innerHTML = `${dist.toFixed(2)} <span class="text-sm">m</span>`;
         document.getElementById('cum-text').innerText = cumulativeDose.toFixed(4);
 
-        // ===== [신규 추가] 누적 피폭량 0.001 도달 시 알람 로직 =====
-        if (cumulativeDose >= 0.001 && !alarmTriggered) {
+        // ===== [신규 추가] 누적 피폭량 0.01 도달 시 알람 로직 =====
+        if (cumulativeDose >= 0.01 && !alarmTriggered) {
             alarmTriggered = true; // 중복 발생 방지
             
             // 1. 알람 소리 재생 (빠르게 4번 삐-삐-삐-삐)
@@ -319,7 +319,7 @@ function update() {
             alarmSynth.triggerAttackRelease("C6", "16n", t + 0.6);
             
             // 2. 화면 상단 경고 메시지 토스트
-            showToast("🚨 위험: 누적 피폭량이 0.001 mSv를 초과했습니다!");
+            showToast("🚨 위험: 누적 피폭량이 0.01 mSv를 초과했습니다!");
             
             // 3. 화면 붉은색 점멸 효과
             const flash = document.createElement('div');
