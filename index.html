@@ -22,12 +22,13 @@
 </head>
 <body>
 
-<!-- 1. 앱 시작 인트로 화면 (배경이미지 적용 및 타이틀/아이콘 삭제) -->
+<!-- 1. 앱 시작 인트로 화면 (배경이미지 적용 및 60px 간격 조정) -->
 <div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center px-6" style="background: url('background4.png') center/cover no-repeat;">
     
     <p class="text-sky-400 font-bold mb-6 text-center text-sm drop-shadow-md">도보/가상 이동 + 차폐 시뮬레이션</p>
     
-    <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 mb-8 max-w-sm text-center shadow-xl w-full">
+    <!-- mt-[60px]로 텍스트에서 60px 내리고, mb-[92px]로 아래 버튼을 기존보다 60px 더 밀어냅니다 (기존 32px + 60px = 92px) -->
+    <div class="mt-[60px] bg-slate-800 p-6 rounded-xl border border-slate-700 mb-[92px] max-w-sm text-center shadow-xl w-full">
         <label class="text-[12px] text-slate-400 uppercase font-bold block mb-3">실습 기준 선량 (1m 거리 기준)</label>
         <div class="flex items-center justify-center gap-2">
             <input type="number" id="base-dose-input" value="100" class="w-28 bg-slate-900 border border-slate-600 rounded-lg py-3 px-2 text-white text-center font-orbitron text-2xl focus:border-sky-500 outline-none">
@@ -265,7 +266,6 @@ function resetSystem() { location.reload(); }
 document.getElementById('reset-btn').addEventListener('click', resetSystem);
 
 function update() {
-    // 안정적인 실행을 위해 불필요한 AR 모드 체크 조건을 제외했습니다.
     if (targetLocked) {
         const now = performance.now();
         const dtHours = (now - lastFrameTime) / 3600000;
@@ -293,7 +293,6 @@ function update() {
         document.getElementById('dist-text').innerHTML = `${dist.toFixed(2)} <span class="text-sm">m</span>`;
         document.getElementById('cum-text').innerText = cumulativeDose.toFixed(4);
 
-        // 선량에 따른 화면 숫자 색상 변경 로직 복구
         if (currentDoseRate > baseDoseAt1m * 1.5) {
             doseDisp.className = "font-orbitron text-7xl font-bold text-red-500 hazard-glow leading-none tracking-tighter";
         } else if (currentDoseRate > baseDoseAt1m * 0.5) {
@@ -304,7 +303,6 @@ function update() {
             doseDisp.className = "font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter";
         }
 
-        // 선량에 따른 가이거 계수기 사운드 발생 로직 (복구)
         const tickInterval = Math.max(20, 1000 / (currentDoseRate * 0.5 + 1));
         if (now > nextTickTime && currentDoseRate > 0) {
             synth.triggerAttackRelease("32n");
