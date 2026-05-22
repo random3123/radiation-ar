@@ -23,10 +23,10 @@
 </head>
 <body>
 
-<!-- 1. 앱 시작 인트로 화면 (background5.png 로 변경) -->
+<!-- 1. 앱 시작 인트로 화면 (background5.png) -->
 <div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center px-6" style="background: url('background5.png') center/cover no-repeat;">
     
-    <!-- 전체 요소를 화면 중앙에서 30px 더 아래로(총 150px) 이동 -->
+    <!-- 전체 요소를 화면 중앙에서 150px 아래로 이동 -->
     <div class="w-full max-w-sm flex flex-col items-center translate-y-[150px]">
         
         <!-- 박스와 실습시작 버튼 간격을 40px로 유지 -->
@@ -140,7 +140,7 @@
         </a-ring>
     </a-entity>
 
-    <!-- 차폐체 (중앙 정렬된 텍스트 포함) -->
+    <!-- 차폐체 -->
     <a-entity id="shield-object" visible="false">
         <a-box width="0.5" height="0.7" depth="0.2" color="#ffffff" material="opacity: 0.95; transparent: true"></a-box>
         <a-text id="shield-label" value="SHIELD" align="center" position="0 0 0.11" color="#ffffff" scale="0.35 0.35 0.35"></a-text>
@@ -156,6 +156,9 @@ let lastFrameTime = performance.now();
 let sourcePosition = new THREE.Vector3();
 let nextTickTime = 0;
 
+// 알람 트리거 상태 변수 추가
+let alarmTriggered = false;
+
 // 차폐 관련 변수
 let shieldActive = false;
 let shieldMaterial = 'none';
@@ -168,10 +171,18 @@ const shieldingData = {
     gamma: { none: 1.0, paper: 1.00, plastic: 1.00, lead: 0.10 }  
 };
 
+// 가이거 계수기 타격음(백색소음)
 const synth = new Tone.NoiseSynth({
     noise: { type: 'white' },
     envelope: { attack: 0.001, decay: 0.015, sustain: 0 }
 }).toDestination();
+
+// 위험 경고용 알람 사운드(고주파 비프음) 추가
+const alarmSynth = new Tone.Synth({
+    oscillator: { type: 'square' },
+    envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.1 }
+}).toDestination();
+alarmSynth.volume.value = -5;
 
 const sceneEl = document.querySelector('a-scene');
 
@@ -289,11 +300,35 @@ function update() {
             }
         }
 
+        // 누적 피폭량 계산
         cumulativeDose += currentDoseRate * dtHours;
         const doseDisp = document.getElementById('dose-display');
         doseDisp.innerText = currentDoseRate.toFixed(2);
         document.getElementById('dist-text').innerHTML = `${dist.toFixed(2)} <span class="text-sm">m</span>`;
         document.getElementById('cum-text').innerText = cumulativeDose.toFixed(4);
+
+        // ===== [신규 추가] 누적 피폭량 0.001 도달 시 알람 로직 =====
+        if (cumulativeDose >= 0.001 && !alarmTriggered) {
+            alarmTriggered = true; // 중복 발생 방지
+            
+            // 1. 알람 소리 재생 (빠르게 4번 삐-삐-삐-삐)
+            const t = Tone.now();
+            alarmSynth.triggerAttackRelease("C6", "16n", t);
+            alarmSynth.triggerAttackRelease("C6", "16n", t + 0.2);
+            alarmSynth.triggerAttackRelease("C6", "16n", t + 0.4);
+            alarmSynth.triggerAttackRelease("C6", "16n", t + 0.6);
+            
+            // 2. 화면 상단 경고 메시지 토스트
+            showToast("🚨 위험: 누적 피폭량이 0.001 mSv를 초과했습니다!");
+            
+            // 3. 화면 붉은색 점멸 효과
+            const flash = document.createElement('div');
+            flash.className = "fixed inset-0 bg-red-600/40 z-[2000] pointer-events-none transition-all duration-500";
+            document.body.appendChild(flash);
+            setTimeout(() => { flash.style.opacity = '0'; }, 500);
+            setTimeout(() => { flash.remove(); }, 1000);
+        }
+        // ========================================================
 
         if (currentDoseRate > baseDoseAt1m * 1.5) {
             doseDisp.className = "font-orbitron text-7xl font-bold text-red-500 hazard-glow leading-none tracking-tighter";
