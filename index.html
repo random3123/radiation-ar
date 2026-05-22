@@ -17,23 +17,28 @@
         #crosshair { position: fixed; top: 50%; left: 50%; width: 24px; height: 24px; border: 2px solid rgba(255, 255, 255, 0.8); border-radius: 50%; transform: translate(-50%, -50%); z-index: 1000; pointer-events: none; display: none; }
         #crosshair::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: white; border-radius: 50%; transform: translate(-50%, -50%); }
 
+        /* 가상환경(VR) 버튼은 숨기고, AR(전체화면) 버튼만 유지 */
         .a-enter-vr { display: none !important; }
+        
+        /* 커스텀 투명 입력창 (배경 이미지의 100 글씨와 유사하게 연출) */
+        .custom-input {
+            background: transparent;
+            color: #4ade80; /* 밝은 에메랄드 그린 */
+            text-shadow: 0 0 15px rgba(74, 222, 128, 0.8);
+            border: none;
+            outline: none;
+        }
     </style>
 </head>
 <body>
 
-<div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-900 px-6" style="background-image: url('new_app_background.png'); background-size: cover; background-position: center;">
+<div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-end pb-[10vh] px-6" style="background-image: url('1000038573.png'); background-size: cover; background-position: center; background-color: #0f172a;">
     
-    <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 mb-8 max-w-sm text-center shadow-xl w-full">
-        <label class="text-[12px] text-slate-400 uppercase font-bold block mb-3">실습 기준 선량 (1m 거리 기준)</label>
-        <div class="flex items-center justify-center gap-2">
-            <input type="number" id="base-dose-input" value="100" class="w-28 bg-slate-900 border border-slate-600 rounded-lg py-3 px-2 text-white text-center font-orbitron text-2xl focus:border-sky-500 outline-none">
-            <span class="text-slate-400 font-bold">mSv/h</span>
-        </div>
-        <p class="text-slate-400 text-[10px] mt-4">선원은 스마트폰 정면 <span class="text-amber-400 font-bold">3m 앞</span>에 생성됩니다.</p>
+    <div class="w-full max-w-[300px] mb-[6vh] flex flex-col items-center">
+        <input type="number" id="base-dose-input" value="100" class="custom-input w-32 text-center font-orbitron text-[4rem] font-bold">
     </div>
 
-    <button id="start-ar-btn" class="bg-green-600 hover:bg-green-500 px-12 py-4 rounded-2xl font-bold text-lg shadow-[0_0_20px_rgba(22,163,74,0.5)] transition-all active:scale-95 w-auto max-w-xs text-white">
+    <button id="start-ar-btn" class="w-[65%] max-w-[260px] py-4 bg-gradient-to-r from-[#4ade80] to-[#22c55e] hover:from-[#22c55e] hover:to-[#16a34a] rounded-full font-bold text-xl text-white shadow-[0_0_20px_rgba(74,222,128,0.5)] transition-all active:scale-95 border border-white/40">
         실습 시작
     </button>
 </div>
@@ -155,168 +160,4 @@ const shieldingData = {
 
 const synth = new Tone.NoiseSynth({
     noise: { type: 'white' },
-    envelope: { attack: 0.001, decay: 0.015, sustain: 0 }
-}).toDestination();
-
-const sceneEl = document.querySelector('a-scene');
-
-document.getElementById('start-ar-btn').addEventListener('click', async () => {
-    try {
-        await Tone.start();
-        baseDoseAt1m = parseFloat(document.getElementById('base-dose-input').value) || 100;
-        
-        document.getElementById('intro-screen').style.display = 'none';
-        document.getElementById('ui-overlay').style.display = 'block';
-        document.getElementById('crosshair').style.display = 'block';
-        lastFrameTime = performance.now();
-        
-        const enterARBtn = document.querySelector('.a-enter-ar-button');
-        if (enterARBtn) { enterARBtn.click(); } 
-    } catch (e) { console.error(e); }
-});
-
-sceneEl.addEventListener('exit-vr', () => {
-    document.getElementById('intro-screen').style.display = 'flex';
-    document.getElementById('ui-overlay').style.display = 'none';
-    resetSystem();
-});
-
-document.getElementById('place-btn').addEventListener('click', () => {
-    const camera = document.getElementById('main-camera').object3D;
-    sourcePosition.set(0, 0, -3);
-    camera.localToWorld(sourcePosition);
-    document.getElementById('radiation-source').setAttribute('position', `${sourcePosition.x} ${sourcePosition.y} ${sourcePosition.z}`);
-    document.getElementById('radiation-source').setAttribute('visible', 'true');
-    
-    // 처음에 지정한 선량 크기만 라벨에 표시
-    document.getElementById('source-label').setAttribute('value', `${baseDoseAt1m} mSv/h`);
-    
-    targetLocked = true;
-    document.getElementById('place-btn').classList.add('hidden');
-    document.getElementById('reset-btn').classList.remove('hidden');
-    document.getElementById('shield-controls').classList.remove('hidden');
-    document.getElementById('shield-controls').classList.add('flex');
-    document.getElementById('crosshair').style.display = 'none';
-    document.getElementById('manual-controls').style.display = 'flex';
-});
-
-document.getElementById('live-rad-type').addEventListener('change', (e) => {
-    const types = { alpha: "알파선(α)", beta: "베타선(β)", gamma: "감마선(γ)" };
-    showToast(`방사선이 [ ${types[e.target.value]} ] 으로 변경되었습니다.`);
-});
-
-document.getElementById('shield-type').addEventListener('change', () => {
-    if(shieldActive || document.getElementById('shield-type').value !== 'none') {
-        document.getElementById('shield-btn').click();
-    }
-});
-
-document.getElementById('shield-btn').addEventListener('click', () => {
-    shieldMaterial = document.getElementById('shield-type').value;
-    const sObj = document.getElementById('shield-object');
-    
-    if(shieldMaterial === 'none') {
-        shieldActive = false;
-        sObj.setAttribute('visible', 'false');
-        return;
-    }
-    
-    const camera = document.getElementById('main-camera').object3D;
-    shieldPosition.set(0, 0, -1);
-    camera.localToWorld(shieldPosition);
-    sObj.setAttribute('position', `${shieldPosition.x} ${shieldPosition.y} ${shieldPosition.z}`);
-    sObj.setAttribute('visible', 'true');
-    shieldActive = true;
-    
-    const box = sObj.querySelector('a-box');
-    const label = sObj.querySelector('a-text');
-    if(shieldMaterial === 'paper') { box.setAttribute('color', '#b45309'); label.setAttribute('value', 'PAPER'); }
-    if(shieldMaterial === 'plastic') { box.setAttribute('color', '#1e3a8a'); label.setAttribute('value', 'PLASTIC'); }
-    if(shieldMaterial === 'lead') { box.setAttribute('color', '#334155'); label.setAttribute('value', 'LEAD'); }
-    
-    sObj.object3D.lookAt(camera.position); 
-});
-
-function moveSource(deltaDistance) {
-    if (!targetLocked) return;
-    let currentCamPos = new THREE.Vector3();
-    document.getElementById('main-camera').object3D.getWorldPosition(currentCamPos);
-    let direction = new THREE.Vector3().subVectors(sourcePosition, currentCamPos).normalize();
-    sourcePosition.add(direction.multiplyScalar(deltaDistance));
-    if (currentCamPos.distanceTo(sourcePosition) < 0.1) {
-        direction.normalize(); 
-        sourcePosition.copy(currentCamPos).add(direction.multiplyScalar(0.1));
-    }
-    document.getElementById('radiation-source').setAttribute('position', `${sourcePosition.x} ${sourcePosition.y} ${sourcePosition.z}`);
-}
-
-function resetSystem() { location.reload(); }
-document.getElementById('reset-btn').addEventListener('click', resetSystem);
-
-function update() {
-    // 안정적인 실행을 위해 불필요한 AR 모드 체크 조건을 제외했습니다.
-    if (targetLocked) {
-        const now = performance.now();
-        const dtHours = (now - lastFrameTime) / 3600000;
-        lastFrameTime = now;
-
-        let currentCamPos = new THREE.Vector3();
-        document.getElementById('main-camera').object3D.getWorldPosition(currentCamPos);
-        let dist = Math.max(0.1, currentCamPos.distanceTo(sourcePosition));
-        let currentDoseRate = baseDoseAt1m * Math.pow(1.0 / dist, 2);
-
-        if (shieldActive) {
-            let currentRadType = document.getElementById('live-rad-type').value;
-            let camToShield = currentCamPos.distanceTo(shieldPosition);
-            let camToSource = currentCamPos.distanceTo(sourcePosition);
-            let sourceToShield = sourcePosition.distanceTo(shieldPosition);
-            
-            if (camToShield < camToSource && sourceToShield < camToSource) {
-                currentDoseRate *= shieldingData[currentRadType][shieldMaterial]; 
-            }
-        }
-
-        cumulativeDose += currentDoseRate * dtHours;
-        const doseDisp = document.getElementById('dose-display');
-        doseDisp.innerText = currentDoseRate.toFixed(2);
-        document.getElementById('dist-text').innerHTML = `${dist.toFixed(2)} <span class="text-sm">m</span>`;
-        document.getElementById('cum-text').innerText = cumulativeDose.toFixed(4);
-
-        // 선량에 따른 화면 숫자 색상 변경 로직 복구
-        if (currentDoseRate > baseDoseAt1m * 1.5) {
-            doseDisp.className = "font-orbitron text-7xl font-bold text-red-500 hazard-glow leading-none tracking-tighter";
-        } else if (currentDoseRate > baseDoseAt1m * 0.5) {
-            doseDisp.className = "font-orbitron text-7xl font-bold text-yellow-400 leading-none tracking-tighter";
-        } else if (currentDoseRate === 0) {
-            doseDisp.className = "font-orbitron text-7xl font-bold text-slate-500 leading-none tracking-tighter";
-        } else {
-            doseDisp.className = "font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter";
-        }
-
-        // 선량에 따른 가이거 계수기 사운드 발생 로직 (복구)
-        const tickInterval = Math.max(20, 1000 / (currentDoseRate * 0.5 + 1));
-        if (now > nextTickTime && currentDoseRate > 0) {
-            synth.triggerAttackRelease("32n");
-            nextTickTime = now + tickInterval;
-        }
-
-        document.getElementById('radiation-source').object3D.lookAt(currentCamPos);
-    }
-    requestAnimationFrame(update);
-}
-
-function showToast(msg) {
-    const t = document.createElement('div');
-    t.className = "fixed top-[30%] left-1/2 -translate-x-1/2 bg-slate-900/95 text-white px-6 py-3 rounded-xl z-[3000] border border-sky-500 text-[13px] font-bold shadow-[0_0_20px_rgba(0,0,0,0.8)] transition-all duration-300 pointer-events-none text-center whitespace-nowrap";
-    t.innerText = msg;
-    document.getElementById('ui-overlay').appendChild(t);
-    setTimeout(() => {
-        t.style.opacity = '0';
-        setTimeout(() => t.remove(), 500);
-    }, 2000);
-}
-
-update();
-</script>
-</body>
-</html>
+    envelope: { attack: 0.001, decay: 0.015, sustain: 0
