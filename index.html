@@ -30,7 +30,7 @@
         <div class="bg-white/85 backdrop-blur-md p-6 rounded-xl border border-white/60 mb-[16px] text-center shadow-[0_8px_30px_rgba(0,0,0,0.15)] w-full">
             <label class="text-[13px] text-slate-700 uppercase font-extrabold block mb-3">실습 기준 선량 (1m 거리 기준)</label>
             <div class="flex items-center justify-center gap-2">
-                <input type="number" id="base-dose-input" value="100" class="w-28 bg-white border-2 border-blue-200 rounded-lg py-3 px-2 text-slate-800 text-center font-orbitron text-2xl focus:border-blue-500 outline-none shadow-inner transition-colors">
+                <input type="number" id="base-dose-input" value="20" class="w-28 bg-white border-2 border-blue-200 rounded-lg py-3 px-2 text-slate-800 text-center font-orbitron text-2xl focus:border-blue-500 outline-none shadow-inner transition-colors">
                 <span class="text-slate-700 font-bold">mSv/h</span>
             </div>
             <p class="text-slate-500 text-[11px] mt-4 font-semibold">선원은 스마트폰 정면 <span class="text-blue-600 font-extrabold">3m 앞</span>에 생성됩니다.</p>
@@ -140,7 +140,7 @@
 <script>
 // --- 전역 변수 ---
 let targetLocked = false;
-let baseDoseAt1m = 100;
+let baseDoseAt1m = 20; // 초기값을 100에서 20으로 수정
 let cumulativeDose = 0;
 let lastFrameTime = performance.now();
 let sourcePosition = new THREE.Vector3();
@@ -177,7 +177,7 @@ const sceneEl = document.querySelector('a-scene');
 document.getElementById('start-ar-btn').addEventListener('click', async () => {
     try {
         await Tone.start();
-        baseDoseAt1m = parseFloat(document.getElementById('base-dose-input').value) || 100;
+        baseDoseAt1m = parseFloat(document.getElementById('base-dose-input').value) || 20; // 대체값도 20으로 수정
         
         document.getElementById('intro-screen').style.display = 'none';
         document.getElementById('ui-overlay').style.display = 'block';
