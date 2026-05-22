@@ -20,25 +20,34 @@
         /* 가상환경(VR) 버튼은 숨기고, AR(전체화면) 버튼만 유지 */
         .a-enter-vr { display: none !important; }
         
-        /* 커스텀 투명 입력창 (배경 이미지의 100 글씨와 유사하게 연출) */
+        /* 커스텀 투명 입력창 */
         .custom-input {
-            background: transparent;
+            background: rgba(0, 0, 0, 0.2);
             color: #4ade80; /* 밝은 에메랄드 그린 */
-            text-shadow: 0 0 15px rgba(74, 222, 128, 0.8);
-            border: none;
+            text-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+            border: 1px solid rgba(74, 222, 128, 0.3);
+            border-radius: 8px;
             outline: none;
+            padding: 4px;
         }
     </style>
 </head>
 <body>
 
-<div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-end pb-[10vh] px-6" style="background-image: url('background.png'); background-size: cover; background-position: center; background-color: #0f172a;">
+<div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-end pb-[10vh] px-6" style="background-image: url('New_app_background.png'); background-size: cover; background-position: center; background-color: #0f172a;">
     
-    <div class="w-full max-w-[300px] mb-[6vh] flex flex-col items-center">
-        <input type="number" id="base-dose-input" value="100" class="custom-input w-32 text-center font-orbitron text-[4rem] font-bold">
+    <div class="bg-white/10 backdrop-blur-md p-6 rounded-2xl border border-white/30 mb-[4vh] w-full max-w-[320px] text-center shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
+        <label class="text-[12px] text-white uppercase font-bold block mb-4 tracking-wider drop-shadow-md">실습 기준 선량 (1M 거리 기준)</label>
+        
+        <div class="flex items-center justify-center gap-3">
+            <input type="number" id="base-dose-input" value="100" class="custom-input w-28 text-center font-orbitron text-4xl font-bold focus:border-white">
+            <span class="text-white font-bold text-xl drop-shadow-md">mSv/h</span>
+        </div>
+        
+        <p class="text-white/80 text-[11px] mt-5 font-medium">선원은 스마트폰 정면 <span class="text-amber-300 font-bold drop-shadow-sm">3m 앞</span>에 생성됩니다.</p>
     </div>
 
-    <button id="start-ar-btn" class="w-[65%] max-w-[260px] py-4 bg-gradient-to-r from-[#4ade80] to-[#22c55e] hover:from-[#22c55e] hover:to-[#16a34a] rounded-full font-bold text-xl text-white shadow-[0_0_20px_rgba(74,222,128,0.5)] transition-all active:scale-95 border border-white/40">
+    <button id="start-ar-btn" class="w-[70%] max-w-[280px] py-4 bg-gradient-to-r from-[#4ade80] to-[#22c55e] hover:from-[#22c55e] hover:to-[#16a34a] rounded-full font-bold text-xl text-white shadow-[0_0_20px_rgba(74,222,128,0.5)] transition-all active:scale-95 border border-white/40">
         실습 시작
     </button>
 </div>
