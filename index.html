@@ -25,22 +25,26 @@
 <!-- 1. 앱 시작 인트로 화면 -->
 <div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center px-6" style="background: url('background4.png') center/cover no-repeat;">
     
-    <p class="text-sky-400 font-bold mb-6 text-center text-sm drop-shadow-md">도보/가상 이동 + 차폐 시뮬레이션</p>
-    
-    <!-- flexbox의 정렬을 건드리지 않고 박스만 강제로 60px(1.5cm) 아래로 내리는 'relative top-[60px]' 적용 -->
-    <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 mb-[92px] max-w-sm text-center shadow-xl w-full relative top-[60px]">
-        <label class="text-[12px] text-slate-400 uppercase font-bold block mb-3">실습 기준 선량 (1m 거리 기준)</label>
-        <div class="flex items-center justify-center gap-2">
-            <input type="number" id="base-dose-input" value="100" class="w-28 bg-slate-900 border border-slate-600 rounded-lg py-3 px-2 text-white text-center font-orbitron text-2xl focus:border-sky-500 outline-none">
-            <span class="text-slate-400 font-bold">mSv/h</span>
+    <!-- 전체 요소들을 하나의 그룹으로 묶고 통째로 120px 아래로 확 내립니다 (translate-y-[120px]) -->
+    <div class="w-full max-w-sm flex flex-col items-center translate-y-[120px]">
+        
+        <p class="text-sky-400 font-bold mb-6 text-center text-sm drop-shadow-md">도보/가상 이동 + 차폐 시뮬레이션</p>
+        
+        <!-- 박스 밑면과 실습시작 버튼 상단 간격을 정확히 80px로 고정 (mb-[80px]) -->
+        <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 mb-[80px] text-center shadow-xl w-full">
+            <label class="text-[12px] text-slate-400 uppercase font-bold block mb-3">실습 기준 선량 (1m 거리 기준)</label>
+            <div class="flex items-center justify-center gap-2">
+                <input type="number" id="base-dose-input" value="100" class="w-28 bg-slate-900 border border-slate-600 rounded-lg py-3 px-2 text-white text-center font-orbitron text-2xl focus:border-sky-500 outline-none">
+                <span class="text-slate-400 font-bold">mSv/h</span>
+            </div>
+            <p class="text-slate-400 text-[10px] mt-4">선원은 스마트폰 정면 <span class="text-amber-400 font-bold">3m 앞</span>에 생성됩니다.</p>
         </div>
-        <p class="text-slate-400 text-[10px] mt-4">선원은 스마트폰 정면 <span class="text-amber-400 font-bold">3m 앞</span>에 생성됩니다.</p>
-    </div>
 
-    <!-- 버튼은 이전과 동일하게 아래에 배치됩니다 -->
-    <button id="start-ar-btn" class="bg-green-600 hover:bg-green-500 px-8 py-4 rounded-2xl font-bold text-lg shadow-[0_0_20px_rgba(22,163,74,0.5)] transition-all active:scale-95 w-full max-w-sm text-white relative top-[60px]">
-        실습 시작 (카메라 켜기)
-    </button>
+        <button id="start-ar-btn" class="bg-green-600 hover:bg-green-500 px-8 py-4 rounded-2xl font-bold text-lg shadow-[0_0_20px_rgba(22,163,74,0.5)] transition-all active:scale-95 w-full text-white">
+            실습 시작 (카메라 켜기)
+        </button>
+        
+    </div>
 </div>
 
 <!-- 2. AR 실행 중 UI 오버레이 -->
