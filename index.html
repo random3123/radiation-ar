@@ -22,13 +22,13 @@
 </head>
 <body>
 
-<!-- 1. 앱 시작 인트로 화면 (배경이미지 적용 및 60px 간격 조정) -->
+<!-- 1. 앱 시작 인트로 화면 -->
 <div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center px-6" style="background: url('background4.png') center/cover no-repeat;">
     
     <p class="text-sky-400 font-bold mb-6 text-center text-sm drop-shadow-md">도보/가상 이동 + 차폐 시뮬레이션</p>
     
-    <!-- mt-[60px]로 텍스트에서 60px 내리고, mb-[92px]로 아래 버튼을 기존보다 60px 더 밀어냅니다 (기존 32px + 60px = 92px) -->
-    <div class="mt-[60px] bg-slate-800 p-6 rounded-xl border border-slate-700 mb-[92px] max-w-sm text-center shadow-xl w-full">
+    <!-- flexbox의 정렬을 건드리지 않고 박스만 강제로 60px(1.5cm) 아래로 내리는 'relative top-[60px]' 적용 -->
+    <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 mb-[92px] max-w-sm text-center shadow-xl w-full relative top-[60px]">
         <label class="text-[12px] text-slate-400 uppercase font-bold block mb-3">실습 기준 선량 (1m 거리 기준)</label>
         <div class="flex items-center justify-center gap-2">
             <input type="number" id="base-dose-input" value="100" class="w-28 bg-slate-900 border border-slate-600 rounded-lg py-3 px-2 text-white text-center font-orbitron text-2xl focus:border-sky-500 outline-none">
@@ -37,7 +37,8 @@
         <p class="text-slate-400 text-[10px] mt-4">선원은 스마트폰 정면 <span class="text-amber-400 font-bold">3m 앞</span>에 생성됩니다.</p>
     </div>
 
-    <button id="start-ar-btn" class="bg-green-600 hover:bg-green-500 px-8 py-4 rounded-2xl font-bold text-lg shadow-[0_0_20px_rgba(22,163,74,0.5)] transition-all active:scale-95 w-full max-w-sm text-white">
+    <!-- 버튼은 이전과 동일하게 아래에 배치됩니다 -->
+    <button id="start-ar-btn" class="bg-green-600 hover:bg-green-500 px-8 py-4 rounded-2xl font-bold text-lg shadow-[0_0_20px_rgba(22,163,74,0.5)] transition-all active:scale-95 w-full max-w-sm text-white relative top-[60px]">
         실습 시작 (카메라 켜기)
     </button>
 </div>
@@ -139,7 +140,6 @@
     <!-- 차폐체 (중앙 정렬된 텍스트 포함) -->
     <a-entity id="shield-object" visible="false">
         <a-box width="0.5" height="0.7" depth="0.2" color="#ffffff" material="opacity: 0.95; transparent: true"></a-box>
-        <!-- 텍스트 위치: 0 0 0.11 (중앙) -->
         <a-text id="shield-label" value="SHIELD" align="center" position="0 0 0.11" color="#ffffff" scale="0.35 0.35 0.35"></a-text>
     </a-entity>
 </a-scene>
@@ -151,7 +151,7 @@ let baseDoseAt1m = 100;
 let cumulativeDose = 0;
 let lastFrameTime = performance.now();
 let sourcePosition = new THREE.Vector3();
-let nextTickTime = 0; // 가이거 계수기 사운드 타이머 변수
+let nextTickTime = 0;
 
 // 차폐 관련 변수
 let shieldActive = false;
@@ -200,7 +200,6 @@ document.getElementById('place-btn').addEventListener('click', () => {
     document.getElementById('radiation-source').setAttribute('position', `${sourcePosition.x} ${sourcePosition.y} ${sourcePosition.z}`);
     document.getElementById('radiation-source').setAttribute('visible', 'true');
     
-    // 처음에 지정한 선량 크기만 라벨에 표시
     document.getElementById('source-label').setAttribute('value', `${baseDoseAt1m} mSv/h`);
     
     targetLocked = true;
