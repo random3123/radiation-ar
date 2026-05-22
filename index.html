@@ -40,7 +40,7 @@
         <label class="text-[12px] text-white uppercase font-bold block mb-4 tracking-wider text-shadow">실습 기준 선량 (1M 거리 기준)</label>
         
         <div class="flex items-center justify-center gap-3">
-            <input type="number" id="base-dose-input" value="100" class="custom-input w-28 text-center font-orbitron text-4xl font-bold text-white focus:border-white">
+            <input type="number" id="base-dose-input" value="20" class="custom-input w-28 text-center font-orbitron text-4xl font-bold text-white focus:border-white">
             <span class="text-white font-bold text-xl text-shadow">mSv/h</span>
         </div>
         
@@ -144,7 +144,7 @@
 
 <script>
 let targetLocked = false;
-let baseDoseAt1m = 100;
+let baseDoseAt1m = 20;
 let cumulativeDose = 0;
 let lastFrameTime = performance.now();
 let sourcePosition = new THREE.Vector3();
