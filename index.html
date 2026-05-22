@@ -32,7 +32,7 @@
 </head>
 <body>
 
-<div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-end pb-[10vh] px-6" style="background-image: url('1000038573.png'); background-size: cover; background-position: center; background-color: #0f172a;">
+<div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-end pb-[10vh] px-6" style="background-image: url('New_app_background.png'); background-size: cover; background-position: center; background-color: #0f172a;">
     
     <div class="w-full max-w-[300px] mb-[6vh] flex flex-col items-center">
         <input type="number" id="base-dose-input" value="100" class="custom-input w-32 text-center font-orbitron text-[4rem] font-bold">
@@ -160,4 +160,188 @@ const shieldingData = {
 
 const synth = new Tone.NoiseSynth({
     noise: { type: 'white' },
-    envelope: { attack: 0.001, decay: 0.015, sustain: 0
+    envelope: { attack: 0.001, decay: 0.015, sustain: 0 }
+}).toDestination();
+
+const sceneEl = document.querySelector('a-scene');
+
+// A-Frame 씬 로드 후 'AR' 하단 버튼 글씨를 '전체화면'으로 커스텀 변경
+sceneEl.addEventListener('loaded', () => {
+    // AR/VR 버튼 요소 찾기
+    const arBtn = document.querySelector('.a-enter-ar-button');
+    if (arBtn) {
+        arBtn.innerHTML = '전체화면'; // "AR" 대신 "전체화면" 글씨 삽입
+        // 디자인 예쁘게 다듬기
+        arBtn.style.width = '120px';
+        arBtn.style.height = '40px';
+        arBtn.style.background = 'rgba(15, 23, 42, 0.85)';
+        arBtn.style.color = '#fff';
+        arBtn.style.border = '1px solid #4ade80';
+        arBtn.style.borderRadius = '10px';
+        arBtn.style.fontFamily = "'Inter', sans-serif";
+        arBtn.style.fontSize = '14px';
+        arBtn.style.fontWeight = 'bold';
+        arBtn.style.display = 'flex';
+        arBtn.style.alignItems = 'center';
+        arBtn.style.justifyContent = 'center';
+        arBtn.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
+    }
+});
+
+document.getElementById('start-ar-btn').addEventListener('click', async () => {
+    try {
+        await Tone.start();
+        baseDoseAt1m = parseFloat(document.getElementById('base-dose-input').value) || 100;
+        
+        document.getElementById('intro-screen').style.display = 'none';
+        document.getElementById('ui-overlay').style.display = 'block';
+        document.getElementById('crosshair').style.display = 'block';
+        lastFrameTime = performance.now();
+        
+        const enterARBtn = document.querySelector('.a-enter-ar-button');
+        if (enterARBtn) { enterARBtn.click(); } 
+    } catch (e) { console.error(e); }
+});
+
+sceneEl.addEventListener('exit-vr', () => {
+    document.getElementById('intro-screen').style.display = 'flex';
+    document.getElementById('ui-overlay').style.display = 'none';
+    resetSystem();
+});
+
+document.getElementById('place-btn').addEventListener('click', () => {
+    const camera = document.getElementById('main-camera').object3D;
+    sourcePosition.set(0, 0, -3);
+    camera.localToWorld(sourcePosition);
+    document.getElementById('radiation-source').setAttribute('position', `${sourcePosition.x} ${sourcePosition.y} ${sourcePosition.z}`);
+    document.getElementById('radiation-source').setAttribute('visible', 'true');
+    
+    // 처음에 지정한 선량 크기만 라벨에 표시
+    document.getElementById('source-label').setAttribute('value', `${baseDoseAt1m} mSv/h`);
+    
+    targetLocked = true;
+    document.getElementById('place-btn').classList.add('hidden');
+    document.getElementById('reset-btn').classList.remove('hidden');
+    document.getElementById('shield-controls').classList.remove('hidden');
+    document.getElementById('shield-controls').classList.add('flex');
+    document.getElementById('crosshair').style.display = 'none';
+    document.getElementById('manual-controls').style.display = 'flex';
+});
+
+document.getElementById('live-rad-type').addEventListener('change', (e) => {
+    const types = { alpha: "알파선(α)", beta: "베타선(β)", gamma: "감마선(γ)" };
+    showToast(`방사선이 [ ${types[e.target.value]} ] 으로 변경되었습니다.`);
+});
+
+document.getElementById('shield-type').addEventListener('change', () => {
+    if(shieldActive || document.getElementById('shield-type').value !== 'none') {
+        document.getElementById('shield-btn').click();
+    }
+});
+
+document.getElementById('shield-btn').addEventListener('click', () => {
+    shieldMaterial = document.getElementById('shield-type').value;
+    const sObj = document.getElementById('shield-object');
+    
+    if(shieldMaterial === 'none') {
+        shieldActive = false;
+        sObj.setAttribute('visible', 'false');
+        return;
+    }
+    
+    const camera = document.getElementById('main-camera').object3D;
+    shieldPosition.set(0, 0, -1);
+    camera.localToWorld(shieldPosition);
+    sObj.setAttribute('position', `${shieldPosition.x} ${shieldPosition.y} ${shieldPosition.z}`);
+    sObj.setAttribute('visible', 'true');
+    shieldActive = true;
+    
+    const box = sObj.querySelector('a-box');
+    const label = sObj.querySelector('a-text');
+    if(shieldMaterial === 'paper') { box.setAttribute('color', '#b45309'); label.setAttribute('value', 'PAPER'); }
+    if(shieldMaterial === 'plastic') { box.setAttribute('color', '#1e3a8a'); label.setAttribute('value', 'PLASTIC'); }
+    if(shieldMaterial === 'lead') { box.setAttribute('color', '#334155'); label.setAttribute('value', 'LEAD'); }
+    
+    sObj.object3D.lookAt(camera.position); 
+});
+
+function moveSource(deltaDistance) {
+    if (!targetLocked) return;
+    let currentCamPos = new THREE.Vector3();
+    document.getElementById('main-camera').object3D.getWorldPosition(currentCamPos);
+    let direction = new THREE.Vector3().subVectors(sourcePosition, currentCamPos).normalize();
+    sourcePosition.add(direction.multiplyScalar(deltaDistance));
+    if (currentCamPos.distanceTo(sourcePosition) < 0.1) {
+        direction.normalize(); 
+        sourcePosition.copy(currentCamPos).add(direction.multiplyScalar(0.1));
+    }
+    document.getElementById('radiation-source').setAttribute('position', `${sourcePosition.x} ${sourcePosition.y} ${sourcePosition.z}`);
+}
+
+function resetSystem() { location.reload(); }
+document.getElementById('reset-btn').addEventListener('click', resetSystem);
+
+function update() {
+    if (targetLocked) {
+        const now = performance.now();
+        const dtHours = (now - lastFrameTime) / 3600000;
+        lastFrameTime = now;
+
+        let currentCamPos = new THREE.Vector3();
+        document.getElementById('main-camera').object3D.getWorldPosition(currentCamPos);
+        let dist = Math.max(0.1, currentCamPos.distanceTo(sourcePosition));
+        let currentDoseRate = baseDoseAt1m * Math.pow(1.0 / dist, 2);
+
+        if (shieldActive) {
+            let currentRadType = document.getElementById('live-rad-type').value;
+            let camToShield = currentCamPos.distanceTo(shieldPosition);
+            let camToSource = currentCamPos.distanceTo(sourcePosition);
+            let sourceToShield = sourcePosition.distanceTo(shieldPosition);
+            
+            if (camToShield < camToSource && sourceToShield < camToSource) {
+                currentDoseRate *= shieldingData[currentRadType][shieldMaterial]; 
+            }
+        }
+
+        cumulativeDose += currentDoseRate * dtHours;
+        const doseDisp = document.getElementById('dose-display');
+        doseDisp.innerText = currentDoseRate.toFixed(2);
+        document.getElementById('dist-text').innerHTML = `${dist.toFixed(2)} <span class="text-sm">m</span>`;
+        document.getElementById('cum-text').innerText = cumulativeDose.toFixed(4);
+
+        if (currentDoseRate > baseDoseAt1m * 1.5) {
+            doseDisp.className = "font-orbitron text-7xl font-bold text-red-500 hazard-glow leading-none tracking-tighter";
+        } else if (currentDoseRate > baseDoseAt1m * 0.5) {
+            doseDisp.className = "font-orbitron text-7xl font-bold text-yellow-400 leading-none tracking-tighter";
+        } else if (currentDoseRate === 0) {
+            doseDisp.className = "font-orbitron text-7xl font-bold text-slate-500 leading-none tracking-tighter";
+        } else {
+            doseDisp.className = "font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter";
+        }
+
+        const tickInterval = Math.max(20, 1000 / (currentDoseRate * 0.5 + 1));
+        if (now > nextTickTime && currentDoseRate > 0) {
+            synth.triggerAttackRelease("32n");
+            nextTickTime = now + tickInterval;
+        }
+
+        document.getElementById('radiation-source').object3D.lookAt(currentCamPos);
+    }
+    requestAnimationFrame(update);
+}
+
+function showToast(msg) {
+    const t = document.createElement('div');
+    t.className = "fixed top-[30%] left-1/2 -translate-x-1/2 bg-slate-900/95 text-white px-6 py-3 rounded-xl z-[3000] border border-sky-500 text-[13px] font-bold shadow-[0_0_20px_rgba(0,0,0,0.8)] transition-all duration-300 pointer-events-none text-center whitespace-nowrap";
+    t.innerText = msg;
+    document.getElementById('ui-overlay').appendChild(t);
+    setTimeout(() => {
+        t.style.opacity = '0';
+        setTimeout(() => t.remove(), 500);
+    }, 2000);
+}
+
+update();
+</script>
+</body>
+</html>
