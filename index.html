@@ -1,10 +1,9 @@
-```html
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Radiation AR - Hybrid Shielding Lab</title>
+    <title>Radiation AR - KHNP Shielding Lab</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
@@ -12,31 +11,60 @@
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Inter', sans-serif; touch-action: none; user-select: none; }
         .font-orbitron { font-family: 'Orbitron', sans-serif; }
-        .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(56, 189, 248, 0.4); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        
+        /* 반투명 유리 효과 */
+        .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); border: 1px solid rgba(56, 189, 248, 0.3); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
         .hazard-glow { text-shadow: 0 0 20px rgba(239, 68, 68, 1); }
         
+        /* 조준점 (크로스헤어) */
         #crosshair { position: fixed; top: 50%; left: 50%; width: 24px; height: 24px; border: 2px solid rgba(255, 255, 255, 0.8); border-radius: 50%; transform: translate(-50%, -50%); z-index: 1000; pointer-events: none; display: none; }
         #crosshair::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: white; border-radius: 50%; transform: translate(-50%, -50%); }
 
+        /* [요청 반영] A-Frame 기본 하단 'AR' 하얀색 박스 버튼 숨김 */
         .a-enter-vr { display: none !important; }
+
+        /* 배경 이미지 및 UI 컨테이너 설정 */
+        #intro-screen {
+            background-image: url('1000038563.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        /* [요청 반영] 핸드폰 그래픽 화면 안으로 UI를 자연스럽게 밀어넣는 여백 설정 */
+        .phone-inner-ui {
+            margin-top: 30vh; /* 화면 크기에 따라 핸드폰 액정 위치로 내려오도록 설정 */
+            width: 75%;
+            max-width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
     </style>
 </head>
 <body>
 
-<div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-end pb-12 px-6" style="background-image: url('1000038563.png'); background-size: cover; background-position: center; background-repeat: no-repeat; background-color: #0f172a;">
-    
-    <div class="bg-slate-900/80 backdrop-blur-md p-6 rounded-2xl border border-slate-700/50 mb-6 w-full max-w-sm text-center shadow-[0_0_30px_rgba(0,0,0,0.6)]">
-        <label class="text-[12px] text-sky-300 uppercase font-bold block mb-3">실습 기준 선량 (1m 거리 기준)</label>
-        <div class="flex items-center justify-center gap-2">
-            <input type="number" id="base-dose-input" value="100" class="w-28 bg-slate-900 border border-slate-600 rounded-lg py-3 px-2 text-white text-center font-orbitron text-2xl focus:border-sky-500 outline-none">
-            <span class="text-slate-400 font-bold">mSv/h</span>
+<div id="intro-screen" class="fixed inset-0">
+    <div class="phone-inner-ui">
+        <div class="bg-slate-900/70 backdrop-blur-md p-5 rounded-2xl border border-white/20 text-center shadow-2xl">
+            <label class="text-[11px] text-sky-300 uppercase font-bold block mb-2 tracking-tight">실습 기준 선량 (1M 거리 기준)</label>
+            <div class="flex items-center justify-center gap-2">
+                <input type="number" id="base-dose-input" value="100" 
+                       class="w-24 bg-black/50 border border-sky-500/50 rounded-lg py-2 text-white text-center font-orbitron text-2xl focus:outline-none focus:border-sky-400">
+                <span class="text-slate-300 font-bold">mSv/h</span>
+            </div>
+            <p class="text-white/60 text-[9px] mt-3 font-medium">선원은 렌즈 정면 <span class="text-amber-400 font-bold">3m 앞</span>에 생성됩니다.</p>
         </div>
-        <p class="text-slate-400 text-[10px] mt-4">선원은 스마트폰 정면 <span class="text-amber-400 font-bold">3m 앞</span>에 생성됩니다.</p>
-    </div>
 
-    <button id="start-ar-btn" class="bg-indigo-600 hover:bg-indigo-500 px-8 py-4 rounded-2xl font-bold text-lg shadow-[0_0_20px_rgba(79,70,229,0.6)] transition-all active:scale-95 w-full max-w-sm text-white mb-6">
-        실습 시작 (카메라 켜기)
-    </button>
+        <button id="start-ar-btn" class="bg-blue-600/90 hover:bg-blue-500 p-4 rounded-2xl font-bold text-lg text-white shadow-[0_0_20px_rgba(37,99,235,0.6)] transition-all active:scale-95 border border-blue-400/50">
+            실습 시작
+        </button>
+    </div>
 </div>
 
 <div id="ui-overlay" class="absolute inset-0 z-50 hidden" style="pointer-events: none;">
@@ -67,14 +95,10 @@
     </div>
 
     <div id="manual-controls" class="absolute right-4 top-1/2 -translate-y-1/2 flex-col gap-3 pointer-events-auto hidden">
-        <div class="glass p-3 rounded-2xl flex flex-col items-center gap-3 border border-sky-500/30">
+        <div class="glass p-3 rounded-2xl flex flex-col items-center gap-3">
             <span class="text-[10px] text-sky-300 font-bold tracking-widest text-center">가상<br>이동</span>
-            <button onclick="moveSource(-0.5)" class="w-14 h-14 bg-rose-600 rounded-full text-white font-bold active:scale-90 transition-all shadow-[0_0_15px_rgba(225,29,72,0.6)] text-[11px] leading-tight flex flex-col items-center justify-center">
-                ▲<br>접근
-            </button>
-            <button onclick="moveSource(0.5)" class="w-14 h-14 bg-sky-600 rounded-full text-white font-bold active:scale-90 transition-all shadow-[0_0_15px_rgba(2,132,199,0.6)] text-[11px] leading-tight flex flex-col items-center justify-center">
-                ▼<br>후퇴
-            </button>
+            <button onclick="moveSource(-0.5)" class="w-14 h-14 bg-rose-600 rounded-full text-white font-bold active:scale-90 shadow-[0_0_15px_rgba(225,29,72,0.6)] text-[11px] leading-tight flex flex-col items-center justify-center">▲<br>접근</button>
+            <button onclick="moveSource(0.5)" class="w-14 h-14 bg-sky-600 rounded-full text-white font-bold active:scale-90 shadow-[0_0_15px_rgba(2,132,199,0.6)] text-[11px] leading-tight flex flex-col items-center justify-center">▼<br>후퇴</button>
         </div>
     </div>
 
@@ -154,11 +178,7 @@ const shieldingData = {
     gamma: { none: 1.0, paper: 1.00, plastic: 1.00, lead: 0.10 }  
 };
 
-const synth = new Tone.NoiseSynth({
-    noise: { type: 'white' },
-    envelope: { attack: 0.001, decay: 0.015, sustain: 0 }
-}).toDestination();
-
+const synth = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.015, sustain: 0 } }).toDestination();
 const sceneEl = document.querySelector('a-scene');
 
 document.getElementById('start-ar-btn').addEventListener('click', async () => {
@@ -171,16 +191,17 @@ document.getElementById('start-ar-btn').addEventListener('click', async () => {
         document.getElementById('crosshair').style.display = 'block';
         lastFrameTime = performance.now();
 
+        // AR 모드 강제 진입 실행 (하단 하얀색 버튼을 숨겼으므로 코드로 클릭 명령)
         const enterARBtn = document.querySelector('.a-enter-ar-button');
-        if (enterARBtn) { enterARBtn.click(); } 
+        if (enterARBtn) { 
+            enterARBtn.click(); 
+        } else {
+            showToast("AR 모드를 지원하지 않는 환경입니다. 가상 모드로 진행합니다.");
+        }
     } catch (e) { console.error(e); }
 });
 
-sceneEl.addEventListener('exit-vr', () => {
-    document.getElementById('intro-screen').style.display = 'flex';
-    document.getElementById('ui-overlay').style.display = 'none';
-    resetSystem();
-});
+sceneEl.addEventListener('exit-vr', () => { location.reload(); });
 
 document.getElementById('place-btn').addEventListener('click', () => {
     const camera = document.getElementById('main-camera').object3D;
@@ -189,7 +210,7 @@ document.getElementById('place-btn').addEventListener('click', () => {
     document.getElementById('radiation-source').setAttribute('position', `${sourcePosition.x} ${sourcePosition.y} ${sourcePosition.z}`);
     document.getElementById('radiation-source').setAttribute('visible', 'true');
     
-    // 처음에 지정한 선량 크기만 깔끔하게 출력
+    // [요청 반영] 선원 라벨에 최초 지정 선량 크기만 깔끔하게 출력
     document.getElementById('source-label').setAttribute('value', `${baseDoseAt1m} mSv/h`);
     
     targetLocked = true;
@@ -200,9 +221,7 @@ document.getElementById('place-btn').addEventListener('click', () => {
     document.getElementById('crosshair').style.display = 'none';
     document.getElementById('manual-controls').style.display = 'flex';
     
-    const statusMsg = document.getElementById('status-msg');
-    statusMsg.innerText = "3m 앞 배치 완료! 종류와 차폐체를 변경하며 실습하세요.";
-    statusMsg.className = "text-[12px] text-sky-400 font-bold";
+    document.getElementById('status-msg').innerText = "3m 앞 배치 완료! 종류와 차폐체를 변경하며 실습하세요.";
 });
 
 document.getElementById('live-rad-type').addEventListener('change', (e) => {
@@ -223,6 +242,7 @@ document.getElementById('shield-btn').addEventListener('click', () => {
     if(shieldMaterial === 'none') {
         shieldActive = false;
         sObj.setAttribute('visible', 'false');
+        showToast("차폐체를 제거했습니다.");
         return;
     }
     
@@ -256,8 +276,7 @@ function moveSource(deltaDistance) {
     document.getElementById('radiation-source').setAttribute('position', `${sourcePosition.x} ${sourcePosition.y} ${sourcePosition.z}`);
 }
 
-function resetSystem() { location.reload(); }
-document.getElementById('reset-btn').addEventListener('click', resetSystem);
+document.getElementById('reset-btn').addEventListener('click', () => { location.reload(); });
 
 function update() {
     if (targetLocked) {
@@ -310,7 +329,7 @@ function update() {
 
 function showToast(msg) {
     const t = document.createElement('div');
-    t.className = "fixed top-[30%] left-1/2 -translate-x-1/2 bg-slate-900/95 text-white px-6 py-3 rounded-xl z-[3000] border border-sky-500 text-[13px] font-bold shadow-[0_0_20px_rgba(0,0,0,0.8)] transition-all duration-300 pointer-events-none text-center whitespace-nowrap";
+    t.className = "fixed top-[30%] left-1/2 -translate-x-1/2 bg-slate-900/95 text-white px-6 py-3 rounded-xl z-[3000] border border-sky-500 text-[13px] font-bold shadow-2xl transition-all duration-300 pointer-events-none text-center whitespace-nowrap";
     t.innerText = msg;
     document.getElementById('ui-overlay').appendChild(t);
     setTimeout(() => {
@@ -323,5 +342,3 @@ update();
 </script>
 </body>
 </html>
-
-```
