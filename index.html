@@ -42,7 +42,7 @@
                 <input type="number" id="base-dose-input" value="20" class="w-28 bg-white border-2 border-blue-200 rounded-lg py-3 px-2 text-slate-800 text-center font-orbitron text-2xl focus:border-blue-500 outline-none shadow-inner transition-colors">
                 <span class="text-slate-700 font-bold">mSv/h</span>
             </div>
-            <p class="text-slate-500 text-[11px] mt-4 font-semibold">선원은 스마트폰 정면 <span class="text-blue-600 font-extrabold">3m 앞</span>에 생성됩니다.</p>
+            <p class="text-slate-500 text-[11px] mt-4 font-semibold">선원은 스마트폰 정면 <span class="text-blue-600 font-extrabold">2m 앞</span>에 생성됩니다.</p>
         </div>
 
         <button id="start-ar-btn" class="bg-green-600 hover:bg-green-500 px-8 py-4 rounded-2xl font-bold text-lg shadow-[0_0_20px_rgba(22,163,74,0.5)] transition-all active:scale-95 w-full text-white border border-green-400/50">
@@ -83,10 +83,10 @@
         <div class="glass p-3 rounded-2xl flex flex-col items-center gap-3 border border-sky-500/30">
             <span class="text-[10px] text-sky-300 font-bold tracking-widest text-center">가상<br>이동</span>
             <button onclick="moveSource(-0.5)" class="w-14 h-14 bg-rose-600 rounded-full text-white font-bold active:scale-90 transition-all shadow-[0_0_15px_rgba(225,29,72,0.6)] text-[11px] leading-tight flex flex-col items-center justify-center">
-                ▲<br>접근
+                접근
             </button>
             <button onclick="moveSource(0.5)" class="w-14 h-14 bg-sky-600 rounded-full text-white font-bold active:scale-90 transition-all shadow-[0_0_15px_rgba(2,132,199,0.6)] text-[11px] leading-tight flex flex-col items-center justify-center">
-                ▼<br>후퇴
+                후퇴
             </button>
         </div>
     </div>
@@ -97,7 +97,7 @@
                 <select id="live-rad-type" class="flex-1 bg-slate-800 text-amber-400 p-3 rounded-xl border border-slate-600 font-bold outline-none text-[13px] text-center">
                     <option value="alpha">알파선 (α)</option>
                     <option value="beta">베타선 (β)</option>
-                    <option value="gamma">감마선 (γ)</option>
+                    <option value="gamma" selected>감마선 (γ)</option>
                 </select>
                 <select id="shield-type" class="flex-1 bg-slate-800 text-sky-300 p-3 rounded-xl border border-slate-600 font-bold outline-none text-[13px] text-center">
                     <option value="none">차폐체 없음</option>
@@ -113,7 +113,7 @@
 
         <div class="flex gap-2 w-full">
             <button id="place-btn" class="w-full bg-amber-600 py-4 rounded-xl font-bold text-white shadow-lg active:scale-95 text-[14px] uppercase transition-all border border-amber-400/50">
-                📍 조준점 3m 앞에 선원 고정
+                📍 조준점 2m 앞에 선원 고정
             </button>
             <button id="reset-btn" class="w-full bg-slate-700 py-3 rounded-xl font-bold text-white shadow-lg active:scale-95 text-[13px] uppercase transition-all hidden">
                 초기화
@@ -207,7 +207,8 @@ sceneEl.addEventListener('exit-vr', () => {
 
 document.getElementById('place-btn').addEventListener('click', () => {
     const camera = document.getElementById('main-camera').object3D;
-    sourcePosition.set(0, 0, -3);
+    // 선원 초기 생성 위치를 3m 앞(-3)에서 2m 앞(-2)으로 수정
+    sourcePosition.set(0, 0, -2);
     camera.localToWorld(sourcePosition);
     document.getElementById('radiation-source').setAttribute('position', `${sourcePosition.x} ${sourcePosition.y} ${sourcePosition.z}`);
     document.getElementById('radiation-source').setAttribute('visible', 'true');
@@ -293,8 +294,8 @@ function stopDangerAlarm() {
     const popupEl = document.getElementById('danger-popup-window');
     if(popupEl) popupEl.remove();
 
-    // 4. 새롭게 "작업중지 저선량지역으로 이동하세요" 안내 팝업창 띄우기
-    showMoveInstructionPopup("⚠️ 작업중지\n저선량지역으로 이동하세요");
+    // 4. 요청하신 '작업중지 저선량지역 이동' 안내 팝업창 호출
+    showMoveInstructionPopup("⚠️ 작업중지\n저선량지역 이동");
 }
 
 function update() {
@@ -389,7 +390,6 @@ function showDangerPopup(msg) {
     const p = document.createElement('div');
     p.id = "danger-popup-window";
     
-    // 알람정지 버튼 클릭 및 조작 유지를 위해 pointer-events-auto 세팅
     p.className = "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-950/95 text-white p-8 rounded-2xl z-[3005] border-4 border-red-500 shadow-[0_0_40px_rgba(239,68,68,0.8)] transition-all duration-300 pointer-events-auto text-center flex flex-col items-center justify-center gap-6 w-[85%] max-w-md";
     
     const textSpan = document.createElement('div');
@@ -398,7 +398,6 @@ function showDangerPopup(msg) {
     p.appendChild(textSpan);
     
     const stopBtn = document.createElement('button');
-    // 두 줄 방지를 위해 whitespace-nowrap 추가 및 간격 패딩 패킹 최적화하여 무조건 한 줄 노출 유도
     stopBtn.className = "w-full bg-red-600 hover:bg-red-500 text-white font-extrabold py-3 px-2 rounded-xl text-md md:text-lg shadow-lg active:scale-95 transition-all border border-red-400/50 uppercase cursor-pointer whitespace-nowrap overflow-hidden text-center";
     stopBtn.innerText = "🚨 알람 정지 (경고 끄기)";
     
@@ -410,7 +409,7 @@ function showDangerPopup(msg) {
     document.getElementById('ui-overlay').appendChild(p);
 }
 
-// [신규 기능] 알람 해제 후 나타나는 대형 안내 이동 메시지 팝업창 함수
+// 알람 해제 후 나타나는 대형 안내 이동 메시지 팝업창 함수
 function showMoveInstructionPopup(msg) {
     const p = document.createElement('div');
     p.id = "move-instruction-window";
