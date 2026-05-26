@@ -19,6 +19,15 @@
 
         /* A-Frame 기본 AR/VR 진입 사각버튼 화면에서 완전히 숨기기 */
         .a-enter-vr, .a-enter-ar, .a-enter-ar-button, .a-enter-vr-button { display: none !important; }
+
+        /* 경고 발생 시 무한 깜빡임 애니메이션 추가 */
+        @keyframes pulse-danger {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 0.6; }
+        }
+        .infinite-danger-flash {
+            animation: pulse-danger 0.8s infinite;
+        }
     </style>
 </head>
 <body>
@@ -140,12 +149,13 @@
 <script>
 // --- 전역 변수 ---
 let targetLocked = false;
-let baseDoseAt1m = 20; // 초기값을 100에서 20으로 수정
+let baseDoseAt1m = 20; 
 let cumulativeDose = 0;
 let lastFrameTime = performance.now();
 let sourcePosition = new THREE.Vector3();
 let nextTickTime = 0;
 let alarmTriggered = false;
+let alarmIntervalId = null; // 알람음 연속 재생을 위한 인터벌 ID
 
 // 차폐 관련 변수
 let shieldActive = false;
@@ -177,7 +187,7 @@ const sceneEl = document.querySelector('a-scene');
 document.getElementById('start-ar-btn').addEventListener('click', async () => {
     try {
         await Tone.start();
-        baseDoseAt1m = parseFloat(document.getElementById('base-dose-input').value) || 20; // 대체값도 20으로 수정
+        baseDoseAt1m = parseFloat(document.getElementById('base-dose-input').value) || 20; 
         
         document.getElementById('intro-screen').style.display = 'none';
         document.getElementById('ui-overlay').style.display = 'block';
@@ -215,7 +225,7 @@ document.getElementById('place-btn').addEventListener('click', () => {
 
 document.getElementById('live-rad-type').addEventListener('change', (e) => {
     const types = { alpha: "알파선(α)", beta: "베타선(β)", gamma: "감마선(γ)" };
-    showToast(`방사선이 [ ${types[e.target.value]} ] 으로 변경되었습니다.`);
+    showToast(`방사선이 [ ${types[e.target.value]} ] 으로 변경되었습니다.`, 2000);
 });
 
 document.getElementById('shield-type').addEventListener('change', () => {
@@ -263,7 +273,10 @@ function moveSource(deltaDistance) {
     document.getElementById('radiation-source').setAttribute('position', `${sourcePosition.x} ${sourcePosition.y} ${sourcePosition.z}`);
 }
 
-function resetSystem() { location.reload(); }
+function resetSystem() { 
+    if(alarmIntervalId) clearInterval(alarmIntervalId);
+    location.reload(); 
+}
 document.getElementById('reset-btn').addEventListener('click', resetSystem);
 
 function update() {
@@ -294,22 +307,26 @@ function update() {
         document.getElementById('dist-text').innerHTML = `${dist.toFixed(2)} <span class="text-sm">m</span>`;
         document.getElementById('cum-text').innerText = cumulativeDose.toFixed(4);
 
-        if (cumulativeDose >= 0.01 && !alarmTriggered) {
+        // 알람 작동 기준치를 0.01에서 0.1로 변경 및 무한 지속 설정
+        if (cumulativeDose >= 0.1 && !alarmTriggered) {
             alarmTriggered = true; 
             
-            const t = Tone.now();
-            alarmSynth.triggerAttackRelease("C6", "16n", t);
-            alarmSynth.triggerAttackRelease("C6", "16n", t + 0.2);
-            alarmSynth.triggerAttackRelease("C6", "16n", t + 0.4);
-            alarmSynth.triggerAttackRelease("C6", "16n", t + 0.6);
+            // 1. 알람 사운드 무한반복 시작 (0.8초 주기로 계속 삐-삐-삐-삐 재생)
+            alarmIntervalId = setInterval(() => {
+                const t = Tone.now();
+                alarmSynth.triggerAttackRelease("C6", "16n", t);
+                alarmSynth.triggerAttackRelease("C6", "16n", t + 0.2);
+                alarmSynth.triggerAttackRelease("C6", "16n", t + 0.4);
+                alarmSynth.triggerAttackRelease("C6", "16n", t + 0.6);
+            }, 800);
             
-            showToast("🚨 위험: 누적 피폭량이 0.01 mSv를 초과했습니다!");
+            // 2. 사라지지 않는 경고 알람창 표시 (duration을 인자로 주지 않음)
+            showToast("🚨 위험: 누적 피폭량이 0.1 mSv를 초과했습니다!", null);
             
+            // 3. 화면 붉은색 무한 깜빡임 이펙트 추가
             const flash = document.createElement('div');
-            flash.className = "fixed inset-0 bg-red-600/40 z-[2000] pointer-events-none transition-all duration-500";
+            flash.className = "fixed inset-0 bg-red-600 z-[2000] pointer-events-none transition-all infinite-danger-flash";
             document.body.appendChild(flash);
-            setTimeout(() => { flash.style.opacity = '0'; }, 500);
-            setTimeout(() => { flash.remove(); }, 1000);
         }
 
         if (currentDoseRate > baseDoseAt1m * 1.5) {
@@ -333,15 +350,19 @@ function update() {
     requestAnimationFrame(update);
 }
 
-function showToast(msg) {
+// 토스트 메시지 생성 함수 (duration이 주어지지 않으면 사라지지 않음)
+function showToast(msg, duration = 2000) {
     const t = document.createElement('div');
     t.className = "fixed top-[30%] left-1/2 -translate-x-1/2 bg-slate-900/95 text-white px-6 py-3 rounded-xl z-[3000] border border-sky-500 text-[13px] font-bold shadow-[0_0_20px_rgba(0,0,0,0.8)] transition-all duration-300 pointer-events-none text-center whitespace-nowrap";
     t.innerText = msg;
     document.getElementById('ui-overlay').appendChild(t);
-    setTimeout(() => {
-        t.style.opacity = '0';
-        setTimeout(() => t.remove(), 500);
-    }, 2000);
+    
+    if (duration !== null) {
+        setTimeout(() => {
+            t.style.opacity = '0';
+            setTimeout(() => t.remove(), 500);
+        }, duration);
+    }
 }
 
 update();
