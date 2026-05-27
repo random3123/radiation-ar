@@ -287,7 +287,7 @@ document.getElementById('shield-btn').addEventListener('click', () => {
         // 외부에서 불러온 lead1.png 파일 매핑 및 입체감(두께) 제거
         sBox.setAttribute('depth', '0'); 
         sBox.removeAttribute('material');
-        sBox.setAttribute('material', 'src: #lead-texture; opacity: 1.0; transparent: false; color: #ffffff;');
+        sBox.setAttribute('material', 'src: #lead-texture; opacity: 1.0; transparent: true; color: #ffffff;');
         sLabel.setAttribute('value', 'LEAD (납)'); 
         sLabel.setAttribute('color', '#ffffff');
         sLabel.setAttribute('position', '0 0 0.02'); 
