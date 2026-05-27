@@ -32,7 +32,7 @@
 </head>
 <body>
 
-<div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center px-6" style="background: #0f172a;">
+<div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center px-6" style="background: url('background5.png') center/cover no-repeat;">
     
     <div class="w-full max-w-sm flex flex-col items-center translate-y-[150px]">
         
@@ -262,7 +262,7 @@ document.getElementById('shield-type').addEventListener('change', () => {
     }
 });
 
-// 차폐체 설치/변경 로직 수정 (자체 제작된 조끼 활성화)
+// 차폐체 설치/변경 로직
 document.getElementById('shield-btn').addEventListener('click', () => {
     shieldMaterial = document.getElementById('shield-type').value;
     const sObj = document.getElementById('shield-object');
@@ -284,13 +284,13 @@ document.getElementById('shield-btn').addEventListener('click', () => {
     sObj.setAttribute('visible', 'true');
     shieldActive = true;
     
-    // 납 선택 시 조끼 모델링 보여주기
+    // 납 선택 시 자체 생성 조끼 활성화
     if(shieldMaterial === 'lead') {
         sBox.setAttribute('visible', 'false');
         sLabel.setAttribute('visible', 'false');
         sVest.setAttribute('visible', 'true');
     } else {
-        // 종이나 플라스틱 선택 시 기존 박스 렌더링
+        // 종이나 플라스틱 선택 시 기본 박스 구조 활성화
         sVest.setAttribute('visible', 'false');
         sBox.setAttribute('visible', 'true');
         sLabel.setAttribute('visible', 'true');
