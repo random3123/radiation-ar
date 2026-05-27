@@ -279,7 +279,8 @@ document.getElementById('shield-btn').addEventListener('click', () => {
         sBox.setAttribute('depth', '0.2'); 
         sBox.removeAttribute('material');
         sBox.setAttribute('material', 'src: #lego-texture; repeat: 4 6; opacity: 1.0; transparent: false; color: #ffffff;');
-        sLabel.setAttribute('value', 'PLASTIC (LEGO)'); 
+        // 플라스틱 텍스트 줄바꿈 적용
+        sLabel.setAttribute('value', 'PLASTIC\n(LEGO)'); 
         sLabel.setAttribute('color', '#ffffff');
         sLabel.setAttribute('position', '0 0 0.11'); 
         
@@ -288,7 +289,8 @@ document.getElementById('shield-btn').addEventListener('click', () => {
         sBox.setAttribute('depth', '0'); 
         sBox.removeAttribute('material');
         sBox.setAttribute('material', 'src: #lead-texture; opacity: 1.0; transparent: true; color: #ffffff;');
-        sLabel.setAttribute('value', 'LEAD (납)'); 
+        // 납 차폐체 텍스트 삭제 (빈 문자열)
+        sLabel.setAttribute('value', ''); 
         sLabel.setAttribute('color', '#ffffff');
         sLabel.setAttribute('position', '0 0 0.02'); 
     }
