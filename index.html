@@ -32,7 +32,7 @@
 </head>
 <body>
 
-<div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center px-6" style="background: url('background5.png') center/cover no-repeat;">
+<div id="intro-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center px-6" style="background: #0f172a;">
     
     <div class="w-full max-w-sm flex flex-col items-center translate-y-[150px]">
         
@@ -132,7 +132,9 @@
         
         <img id="lego-texture" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'><rect width='128' height='128' fill='%2316a34a'/><pattern id='stud' width='32' height='32' patternUnits='userSpaceOnUse'><circle cx='16' cy='16' r='10' fill='%2315803d'/><circle cx='15' cy='15' r='8' fill='%2322c55e'/></pattern><rect width='128' height='128' fill='url(%23stud)'/></svg>" crossorigin="anonymous">
         
-        <a-asset-item id="vest-model" src="vest.glb"></a-asset-item>
+        <img id="vest-plate-tex" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='500' height='320'><rect width='500' height='320' fill='%23cbd5e1' rx='15'/><text x='250' y='60' font-family='sans-serif' font-size='38' font-weight='900' fill='%230f172a' text-anchor='middle'>방사선 차폐 조끼</text><text x='250' y='105' font-family='sans-serif' font-size='26' font-weight='bold' fill='%23334155' text-anchor='middle'>(LEAD SHIELDING VEST)</text><line x1='50' y1='130' x2='450' y2='130' stroke='%2394a3b8' stroke-width='3'/><text x='250' y='180' font-family='sans-serif' font-size='28' font-weight='bold' fill='%230f172a' text-anchor='middle'>재질: 순납 (Pure Lead)</text><text x='250' y='230' font-family='sans-serif' font-size='28' font-weight='bold' fill='%230f172a' text-anchor='middle'>두께: 5.0mm Pb</text><text x='250' y='280' font-family='sans-serif' font-size='28' font-weight='bold' fill='%230f172a' text-anchor='middle'>코드: LSV-507020-01</text></svg>" crossorigin="anonymous">
+
+        <img id="warning-tex" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='60'><rect width='120' height='60' fill='%23eab308' rx='5'/><text x='60' y='25' font-family='sans-serif' font-size='18' font-weight='900' fill='%23b91c1c' text-anchor='middle'>방사선 주의</text><text x='60' y='48' font-family='sans-serif' font-size='16' font-weight='bold' fill='black' text-anchor='middle'>RADIATION</text></svg>" crossorigin="anonymous">
     </a-assets>
 
     <a-camera id="main-camera" position="0 1.6 0"></a-camera>
@@ -149,13 +151,26 @@
     </a-entity>
 
     <a-entity id="shield-object" visible="false">
-        <a-box id="shield-box" width="0.5" height="0.7" depth="0.2" color="#ffffff" material="opacity: 0.95; transparent: true"></a-box>
         
-        <a-entity id="shield-vest" gltf-model="#vest-model" visible="false" position="0 -0.35 0" scale="0.1 0.1 0.1">
-            <a-text id="shield-vest-label" value="방사선 차폐 조끼\n(LEAD SHIELDING VEST)\n재질: 순납 (Pure Lead)\n두께: 5.0mm Pb\n코드: LSV-507020-01" align="center" position="0 0 0.05" color="#ffffff" scale="0.25 0.25 0.25"></a-text>
+        <a-box id="shield-box" width="0.5" height="0.7" depth="0.2" color="#ffffff" material="opacity: 0.95; transparent: true"></a-box>
+        <a-text id="shield-label" value="SHIELD" align="center" position="0 0 0.11" color="#ffffff" scale="0.35 0.35 0.35"></a-text>
+
+        <a-entity id="shield-vest" visible="false" position="0 -0.15 0">
+            <a-box width="0.55" height="0.5" depth="0.1" color="#64748b" material="roughness: 0.9; metalness: 0.3;"></a-box>
+            
+            <a-box width="0.14" height="0.3" depth="0.1" position="-0.16 0.38 0" color="#64748b" material="roughness: 0.9; metalness: 0.3;"></a-box>
+            
+            <a-box width="0.14" height="0.3" depth="0.1" position="0.16 0.38 0" color="#64748b" material="roughness: 0.9; metalness: 0.3;"></a-box>
+
+            <a-box width="0.16" height="0.12" depth="0.12" position="-0.17 -0.18 0" color="#475569"></a-box>
+            <a-box width="0.16" height="0.12" depth="0.12" position="0 -0.18 0" color="#475569"></a-box>
+            <a-box width="0.16" height="0.12" depth="0.12" position="0.17 -0.18 0" color="#475569"></a-box>
+
+            <a-plane width="0.45" height="0.28" position="0 0.08 0.051" material="src: #vest-plate-tex; transparent: false;"></a-plane>
+
+            <a-plane width="0.1" height="0.05" position="0.16 0.42 0.051" material="src: #warning-tex; transparent: false;"></a-plane>
         </a-entity>
         
-        <a-text id="shield-label" value="SHIELD" align="center" position="0 0 0.11" color="#ffffff" scale="0.35 0.35 0.35"></a-text>
     </a-entity>
 </a-scene>
 
@@ -247,16 +262,14 @@ document.getElementById('shield-type').addEventListener('change', () => {
     }
 });
 
-// 차폐체 설치/변경 로직 수정 (조끼 모델 적용)
+// 차폐체 설치/변경 로직 수정 (자체 제작된 조끼 활성화)
 document.getElementById('shield-btn').addEventListener('click', () => {
     shieldMaterial = document.getElementById('shield-type').value;
     const sObj = document.getElementById('shield-object');
     
-    // 복합 엔티티 내의 엔티티들 선택
     const sBox = document.getElementById('shield-box');
-    const sVest = document.getElementById('shield-vest');
     const sLabel = document.getElementById('shield-label');
-    const sVestLabel = document.getElementById('shield-vest-label');
+    const sVest = document.getElementById('shield-vest');
     
     if(shieldMaterial === 'none') {
         shieldActive = false;
@@ -264,7 +277,6 @@ document.getElementById('shield-btn').addEventListener('click', () => {
         return;
     }
     
-    // 전체 차폐체 위치 및 활성화
     const camera = document.getElementById('main-camera').object3D;
     shieldPosition.set(0, 0, -1);
     camera.localToWorld(shieldPosition);
@@ -272,26 +284,18 @@ document.getElementById('shield-btn').addEventListener('click', () => {
     sObj.setAttribute('visible', 'true');
     shieldActive = true;
     
-    // 재질에 따른 엔티티 전환 및 속성 변경
+    // 납 선택 시 조끼 모델링 보여주기
     if(shieldMaterial === 'lead') {
-        // 납 재질일 때 조끼 모델 활성화
         sBox.setAttribute('visible', 'false');
         sLabel.setAttribute('visible', 'false');
         sVest.setAttribute('visible', 'true');
-        sVestLabel.setAttribute('visible', 'true');
-        // 조끼의 투과율은 shieldingData['gamma']['lead']에 의해 처리되므로 별도의 투과율 계산은 필요 없습니다.
-        // 조끼 두께는 텍스트로만 표시되고 시뮬레이션에는 영향을 주지 않습니다.
-
     } else {
-        // 종이, 플라스틱일 때 상자 모델 활성화 및 기존 로직 수행
+        // 종이나 플라스틱 선택 시 기존 박스 렌더링
         sVest.setAttribute('visible', 'false');
-        sVestLabel.setAttribute('visible', 'false');
         sBox.setAttribute('visible', 'true');
         sLabel.setAttribute('visible', 'true');
         
-        // 기존 상자 변경 로직
         if(shieldMaterial === 'paper') { 
-            // 종이: 두께 0.1m, 편지지 패턴, 어두운 텍스트
             sBox.setAttribute('depth', '0.1'); 
             sBox.removeAttribute('material'); 
             sBox.setAttribute('material', 'src: #paper-texture; repeat: 1 3; opacity: 0.95; transparent: true; color: #ffffff;');
@@ -300,7 +304,6 @@ document.getElementById('shield-btn').addEventListener('click', () => {
             sLabel.setAttribute('position', '0 0 0.055'); 
             
         } else if(shieldMaterial === 'plastic') { 
-            // 플라스틱: 레고 기초판 텍스처
             sBox.setAttribute('depth', '0.2'); 
             sBox.removeAttribute('material');
             sBox.setAttribute('material', 'src: #lego-texture; repeat: 4 6; opacity: 1.0; transparent: false; color: #ffffff;');
@@ -310,7 +313,6 @@ document.getElementById('shield-btn').addEventListener('click', () => {
         }
     }
     
-    // 전체 차폐체 방향 유지
     sObj.object3D.lookAt(camera.position); 
 });
 
