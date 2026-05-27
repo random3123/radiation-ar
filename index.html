@@ -102,7 +102,7 @@
                 <select id="shield-type" class="flex-1 bg-slate-800 text-sky-300 p-3 rounded-xl border border-slate-600 font-bold outline-none text-[13px] text-center">
                     <option value="none">차폐체 없음</option>
                     <option value="paper">종이 (Paper)</option>
-                    <option value="plastic">플라스틱 (Plastic)</option>
+                    <option value="plastic">플라스틱 (Lego)</option>
                     <option value="lead">납 (Lead)</option>
                 </select>
             </div>
@@ -129,6 +129,8 @@
     
     <a-assets>
         <img id="paper-texture" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><rect width='256' height='256' fill='white'/><path d='M 40 0 V 256' stroke='%23ef4444' stroke-width='2'/><path d='M 0 32 H 256 M 0 64 H 256 M 0 96 H 256 M 0 128 H 256 M 0 160 H 256 M 0 192 H 256 M 0 224 H 256' stroke='%233b82f6' stroke-width='1.5'/></svg>" crossorigin="anonymous">
+        
+        <img id="lego-texture" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'><rect width='128' height='128' fill='%2316a34a'/><pattern id='stud' width='32' height='32' patternUnits='userSpaceOnUse'><circle cx='16' cy='16' r='10' fill='%2315803d'/><circle cx='15' cy='15' r='8' fill='%2322c55e'/></pattern><rect width='128' height='128' fill='url(%23stud)'/></svg>" crossorigin="anonymous">
     </a-assets>
 
     <a-camera id="main-camera" position="0 1.6 0"></a-camera>
@@ -262,19 +264,22 @@ document.getElementById('shield-btn').addEventListener('click', () => {
     if(shieldMaterial === 'paper') { 
         // 종이: 두께 0.1m (10cm)로 수정, 편지지 패턴 적용, 글씨 색상 어둡게 변경
         box.setAttribute('depth', '0.1'); 
-        box.removeAttribute('material'); // 기존 재질 초기화
+        box.removeAttribute('material'); 
         box.setAttribute('material', 'src: #paper-texture; repeat: 1 3; opacity: 0.95; transparent: true; color: #ffffff;');
         label.setAttribute('value', 'PAPER'); 
-        label.setAttribute('color', '#1e293b'); // 흰 배경에 잘 보이도록 어두운 회색 적용
-        label.setAttribute('position', '0 0 0.055'); // 두께가 얇아졌으므로 텍스트가 붕 뜨지 않게 위치 조절
+        label.setAttribute('color', '#1e293b'); 
+        label.setAttribute('position', '0 0 0.055'); 
+        
     } else if(shieldMaterial === 'plastic') { 
-        // 플라스틱: 기존 두께(0.2m) 유지, 색상 블루
+        // 플라스틱: 레고 기초판 텍스처 적용
         box.setAttribute('depth', '0.2'); 
         box.removeAttribute('material');
-        box.setAttribute('material', 'opacity: 0.95; transparent: true; color: #1e3a8a;');
-        label.setAttribute('value', 'PLASTIC'); 
+        // src 속성으로 새로 추가한 레고 이미지를 불러오고 repeat 속성으로 블록 패턴을 반복시킵니다.
+        box.setAttribute('material', 'src: #lego-texture; repeat: 4 6; opacity: 1.0; transparent: false; color: #ffffff;');
+        label.setAttribute('value', 'PLASTIC (LEGO)'); 
         label.setAttribute('color', '#ffffff');
         label.setAttribute('position', '0 0 0.11'); 
+        
     } else if(shieldMaterial === 'lead') { 
         // 납: 기존 두께(0.2m) 유지, 색상 다크 그레이
         box.setAttribute('depth', '0.2'); 
