@@ -129,9 +129,10 @@
     
     <a-assets>
         <img id="paper-texture" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><rect width='256' height='256' fill='white'/><path d='M 40 0 V 256' stroke='%23ef4444' stroke-width='2'/><path d='M 0 32 H 256 M 0 64 H 256 M 0 96 H 256 M 0 128 H 256 M 0 160 H 256 M 0 192 H 256 M 0 224 H 256' stroke='%233b82f6' stroke-width='1.5'/></svg>" crossorigin="anonymous">
+        
         <img id="lego-texture" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'><rect width='128' height='128' fill='%2316a34a'/><pattern id='stud' width='32' height='32' patternUnits='userSpaceOnUse'><circle cx='16' cy='16' r='10' fill='%2315803d'/><circle cx='15' cy='15' r='8' fill='%2322c55e'/></pattern><rect width='128' height='128' fill='url(%23stud)'/></svg>" crossorigin="anonymous">
         
-        <img id="lead-texture" src="vest.png" crossorigin="anonymous">
+        <a-asset-item id="vest-model" src="vest.glb"></a-asset-item>
     </a-assets>
 
     <a-camera id="main-camera" position="0 1.6 0"></a-camera>
@@ -148,7 +149,12 @@
     </a-entity>
 
     <a-entity id="shield-object" visible="false">
-        <a-box width="0.5" height="0.7" depth="0.2" color="#ffffff" material="opacity: 0.95; transparent: true"></a-box>
+        <a-box id="shield-box" width="0.5" height="0.7" depth="0.2" color="#ffffff" material="opacity: 0.95; transparent: true"></a-box>
+        
+        <a-entity id="shield-vest" gltf-model="#vest-model" visible="false" position="0 -0.35 0" scale="0.1 0.1 0.1">
+            <a-text id="shield-vest-label" value="방사선 차폐 조끼\n(LEAD SHIELDING VEST)\n재질: 순납 (Pure Lead)\n두께: 5.0mm Pb\n코드: LSV-507020-01" align="center" position="0 0 0.05" color="#ffffff" scale="0.25 0.25 0.25"></a-text>
+        </a-entity>
+        
         <a-text id="shield-label" value="SHIELD" align="center" position="0 0 0.11" color="#ffffff" scale="0.35 0.35 0.35"></a-text>
     </a-entity>
 </a-scene>
@@ -241,10 +247,16 @@ document.getElementById('shield-type').addEventListener('change', () => {
     }
 });
 
-// 차폐체 설치/변경 로직 (두께 및 질감 수정 적용)
+// 차폐체 설치/변경 로직 수정 (조끼 모델 적용)
 document.getElementById('shield-btn').addEventListener('click', () => {
     shieldMaterial = document.getElementById('shield-type').value;
     const sObj = document.getElementById('shield-object');
+    
+    // 복합 엔티티 내의 엔티티들 선택
+    const sBox = document.getElementById('shield-box');
+    const sVest = document.getElementById('shield-vest');
+    const sLabel = document.getElementById('shield-label');
+    const sVestLabel = document.getElementById('shield-vest-label');
     
     if(shieldMaterial === 'none') {
         shieldActive = false;
@@ -252,6 +264,7 @@ document.getElementById('shield-btn').addEventListener('click', () => {
         return;
     }
     
+    // 전체 차폐체 위치 및 활성화
     const camera = document.getElementById('main-camera').object3D;
     shieldPosition.set(0, 0, -1);
     camera.localToWorld(shieldPosition);
@@ -259,35 +272,45 @@ document.getElementById('shield-btn').addEventListener('click', () => {
     sObj.setAttribute('visible', 'true');
     shieldActive = true;
     
-    const box = sObj.querySelector('a-box');
-    const label = sObj.querySelector('a-text');
-    
-    if(shieldMaterial === 'paper') { 
-        box.setAttribute('depth', '0.1'); 
-        box.removeAttribute('material'); 
-        box.setAttribute('material', 'src: #paper-texture; repeat: 1 3; opacity: 0.95; transparent: true; color: #ffffff;');
-        label.setAttribute('value', 'PAPER'); 
-        label.setAttribute('color', '#1e293b'); 
-        label.setAttribute('position', '0 0 0.055'); 
+    // 재질에 따른 엔티티 전환 및 속성 변경
+    if(shieldMaterial === 'lead') {
+        // 납 재질일 때 조끼 모델 활성화
+        sBox.setAttribute('visible', 'false');
+        sLabel.setAttribute('visible', 'false');
+        sVest.setAttribute('visible', 'true');
+        sVestLabel.setAttribute('visible', 'true');
+        // 조끼의 투과율은 shieldingData['gamma']['lead']에 의해 처리되므로 별도의 투과율 계산은 필요 없습니다.
+        // 조끼 두께는 텍스트로만 표시되고 시뮬레이션에는 영향을 주지 않습니다.
+
+    } else {
+        // 종이, 플라스틱일 때 상자 모델 활성화 및 기존 로직 수행
+        sVest.setAttribute('visible', 'false');
+        sVestLabel.setAttribute('visible', 'false');
+        sBox.setAttribute('visible', 'true');
+        sLabel.setAttribute('visible', 'true');
         
-    } else if(shieldMaterial === 'plastic') { 
-        box.setAttribute('depth', '0.2'); 
-        box.removeAttribute('material');
-        box.setAttribute('material', 'src: #lego-texture; repeat: 4 6; opacity: 1.0; transparent: false; color: #ffffff;');
-        label.setAttribute('value', 'PLASTIC (LEGO)'); 
-        label.setAttribute('color', '#ffffff');
-        label.setAttribute('position', '0 0 0.11'); 
-        
-    } else if(shieldMaterial === 'lead') { 
-        // ✨ 납: 사용자가 업로드한 조끼 이미지 텍스처(vest.png)를 적용하도록 변경 ✨
-        box.setAttribute('depth', '0.2'); 
-        box.removeAttribute('material');
-        box.setAttribute('material', 'src: #lead-texture; opacity: 1.0; transparent: false; color: #ffffff;');
-        label.setAttribute('value', 'LEAD VEST'); // 라벨 텍스트도 조끼에 맞게 변경했습니다.
-        label.setAttribute('color', '#ffffff');
-        label.setAttribute('position', '0 0 0.11'); 
+        // 기존 상자 변경 로직
+        if(shieldMaterial === 'paper') { 
+            // 종이: 두께 0.1m, 편지지 패턴, 어두운 텍스트
+            sBox.setAttribute('depth', '0.1'); 
+            sBox.removeAttribute('material'); 
+            sBox.setAttribute('material', 'src: #paper-texture; repeat: 1 3; opacity: 0.95; transparent: true; color: #ffffff;');
+            sLabel.setAttribute('value', 'PAPER'); 
+            sLabel.setAttribute('color', '#1e293b'); 
+            sLabel.setAttribute('position', '0 0 0.055'); 
+            
+        } else if(shieldMaterial === 'plastic') { 
+            // 플라스틱: 레고 기초판 텍스처
+            sBox.setAttribute('depth', '0.2'); 
+            sBox.removeAttribute('material');
+            sBox.setAttribute('material', 'src: #lego-texture; repeat: 4 6; opacity: 1.0; transparent: false; color: #ffffff;');
+            sLabel.setAttribute('value', 'PLASTIC (LEGO)'); 
+            sLabel.setAttribute('color', '#ffffff');
+            sLabel.setAttribute('position', '0 0 0.11'); 
+        }
     }
     
+    // 전체 차폐체 방향 유지
     sObj.object3D.lookAt(camera.position); 
 });
 
