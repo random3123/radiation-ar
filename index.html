@@ -132,7 +132,7 @@
         
         <img id="lego-texture" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'><rect width='128' height='128' fill='%2316a34a'/><pattern id='stud' width='32' height='32' patternUnits='userSpaceOnUse'><circle cx='16' cy='16' r='10' fill='%2315803d'/><circle cx='15' cy='15' r='8' fill='%2322c55e'/></pattern><rect width='128' height='128' fill='url(%23stud)'/></svg>" crossorigin="anonymous">
         
-        <img id="lead-texture" src="lead.png" crossorigin="anonymous">
+        <img id="lead-texture" src="lead1.png" crossorigin="anonymous">
     </a-assets>
 
     <a-camera id="main-camera" position="0 1.6 0"></a-camera>
@@ -284,13 +284,13 @@ document.getElementById('shield-btn').addEventListener('click', () => {
         sLabel.setAttribute('position', '0 0 0.11'); 
         
     } else if(shieldMaterial === 'lead') { 
-        // 외부에서 불러온 lead.png 파일 매핑
-        sBox.setAttribute('depth', '0.2'); 
+        // 외부에서 불러온 lead1.png 파일 매핑 및 입체감(두께) 제거
+        sBox.setAttribute('depth', '0'); 
         sBox.removeAttribute('material');
         sBox.setAttribute('material', 'src: #lead-texture; opacity: 1.0; transparent: false; color: #ffffff;');
         sLabel.setAttribute('value', 'LEAD (납)'); 
         sLabel.setAttribute('color', '#ffffff');
-        sLabel.setAttribute('position', '0 0 0.11'); 
+        sLabel.setAttribute('position', '0 0 0.02'); 
     }
     
     sObj.object3D.lookAt(camera.position); 
