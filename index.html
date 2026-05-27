@@ -129,8 +129,9 @@
     
     <a-assets>
         <img id="paper-texture" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><rect width='256' height='256' fill='white'/><path d='M 40 0 V 256' stroke='%23ef4444' stroke-width='2'/><path d='M 0 32 H 256 M 0 64 H 256 M 0 96 H 256 M 0 128 H 256 M 0 160 H 256 M 0 192 H 256 M 0 224 H 256' stroke='%233b82f6' stroke-width='1.5'/></svg>" crossorigin="anonymous">
-        
         <img id="lego-texture" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'><rect width='128' height='128' fill='%2316a34a'/><pattern id='stud' width='32' height='32' patternUnits='userSpaceOnUse'><circle cx='16' cy='16' r='10' fill='%2315803d'/><circle cx='15' cy='15' r='8' fill='%2322c55e'/></pattern><rect width='128' height='128' fill='url(%23stud)'/></svg>" crossorigin="anonymous">
+        
+        <img id="lead-texture" src="vest.png" crossorigin="anonymous">
     </a-assets>
 
     <a-camera id="main-camera" position="0 1.6 0"></a-camera>
@@ -262,7 +263,6 @@ document.getElementById('shield-btn').addEventListener('click', () => {
     const label = sObj.querySelector('a-text');
     
     if(shieldMaterial === 'paper') { 
-        // 종이: 두께 0.1m (10cm)로 수정, 편지지 패턴 적용, 글씨 색상 어둡게 변경
         box.setAttribute('depth', '0.1'); 
         box.removeAttribute('material'); 
         box.setAttribute('material', 'src: #paper-texture; repeat: 1 3; opacity: 0.95; transparent: true; color: #ffffff;');
@@ -271,21 +271,19 @@ document.getElementById('shield-btn').addEventListener('click', () => {
         label.setAttribute('position', '0 0 0.055'); 
         
     } else if(shieldMaterial === 'plastic') { 
-        // 플라스틱: 레고 기초판 텍스처 적용
         box.setAttribute('depth', '0.2'); 
         box.removeAttribute('material');
-        // src 속성으로 새로 추가한 레고 이미지를 불러오고 repeat 속성으로 블록 패턴을 반복시킵니다.
         box.setAttribute('material', 'src: #lego-texture; repeat: 4 6; opacity: 1.0; transparent: false; color: #ffffff;');
         label.setAttribute('value', 'PLASTIC (LEGO)'); 
         label.setAttribute('color', '#ffffff');
         label.setAttribute('position', '0 0 0.11'); 
         
     } else if(shieldMaterial === 'lead') { 
-        // 납: 기존 두께(0.2m) 유지, 색상 다크 그레이
+        // ✨ 납: 사용자가 업로드한 조끼 이미지 텍스처(vest.png)를 적용하도록 변경 ✨
         box.setAttribute('depth', '0.2'); 
         box.removeAttribute('material');
-        box.setAttribute('material', 'opacity: 0.95; transparent: true; color: #334155;');
-        label.setAttribute('value', 'LEAD'); 
+        box.setAttribute('material', 'src: #lead-texture; opacity: 1.0; transparent: false; color: #ffffff;');
+        label.setAttribute('value', 'LEAD VEST'); // 라벨 텍스트도 조끼에 맞게 변경했습니다.
         label.setAttribute('color', '#ffffff');
         label.setAttribute('position', '0 0 0.11'); 
     }
