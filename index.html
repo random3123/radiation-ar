@@ -20,7 +20,7 @@
             box-shadow: 0 0 20px rgba(0,0,0,0.3); 
         }
 
-        /* (수정) 밝은 톤의 글씨가 카메라(밝은 배경)에서도 무조건 잘 보이도록 진한 다크 그림자(Outline) 효과 적용 */
+        /* 밝은 톤의 글씨가 카메라(밝은 배경)에서도 무조건 잘 보이도록 진한 다크 그림자(Outline) 효과 적용 */
         .ar-text {
             text-shadow: 0 0 4px rgba(0, 0, 0, 1), 0 0 8px rgba(0, 0, 0, 0.8);
         }
@@ -73,9 +73,12 @@
             <span id="rad-type-badge" class="text-[10px] bg-red-600 px-2 py-1 rounded text-white font-bold uppercase border border-red-800"></span>
         </div>
         
-        <div class="text-center py-1">
-            <div id="dose-display" class="font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter ar-text">0.00</div>
-            <div class="text-lg text-green-400 font-extrabold mt-1 ar-text">mSv/h</div>
+        <div class="text-center py-1 flex flex-col items-center">
+            <div class="text-[13px] text-slate-200 uppercase font-extrabold tracking-tighter mb-1 ar-text whitespace-nowrap">시간당 방사선량</div>
+            <div class="flex justify-center items-baseline gap-2">
+                <div id="dose-display" class="font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter ar-text">0.00</div>
+                <div class="text-xl text-green-400 font-extrabold ar-text">mSv/h</div>
+            </div>
         </div>
 
         <div class="grid grid-cols-[40%_60%] gap-2 mt-3 border-t border-slate-700/50 pt-3">
