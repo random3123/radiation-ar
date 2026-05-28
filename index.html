@@ -240,6 +240,9 @@ document.getElementById('place-btn').addEventListener('click', () => {
     document.getElementById('shield-controls').classList.add('flex');
     document.getElementById('crosshair').style.display = 'none';
     document.getElementById('manual-controls').style.display = 'flex';
+    
+    // (추가된 부분) 선원을 배치하면 안내 메시지를 숨김 처리합니다.
+    document.getElementById('status-msg').style.display = 'none';
 });
 
 document.getElementById('live-rad-type').addEventListener('change', (e) => {
@@ -360,7 +363,6 @@ function update() {
         doseDisp.innerText = currentDoseRate.toFixed(2);
         document.getElementById('dist-text').innerHTML = `${dist.toFixed(2)} <span class="text-sm">m</span>`;
         
-        // JS 누적 피폭량 업데이트 (소수점 셋째 자리 + 단위 표시)
         document.getElementById('cum-text').innerHTML = `${cumulativeDose.toFixed(3)} <span class="text-sm">mSv</span>`;
 
         if (cumulativeDose >= 0.1 && !alarmTriggered) {
