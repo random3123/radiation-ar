@@ -20,12 +20,12 @@
             box-shadow: 0 0 20px rgba(0,0,0,0.3); 
         }
 
-        /* AR 환경에서 카메라 배경에 상관없이 글씨가 잘 보이게 하는 흰색 테두리 효과 */
+        /* (수정) 밝은 톤의 글씨가 카메라(밝은 배경)에서도 무조건 잘 보이도록 진한 다크 그림자(Outline) 효과 적용 */
         .ar-text {
-            text-shadow: 0 0 3px rgba(255, 255, 255, 0.9), 0 0 6px rgba(255, 255, 255, 0.9);
+            text-shadow: 0 0 4px rgba(0, 0, 0, 1), 0 0 8px rgba(0, 0, 0, 0.8);
         }
         
-        .hazard-glow { text-shadow: 0 0 15px rgba(239, 68, 68, 1), 0 0 3px white, 0 0 6px white !important; }
+        .hazard-glow { text-shadow: 0 0 15px rgba(239, 68, 68, 1), 0 0 4px black, 0 0 8px black !important; }
         
         #crosshair { position: fixed; top: 50%; left: 50%; width: 24px; height: 24px; border: 2px solid rgba(255, 255, 255, 0.8); border-radius: 50%; transform: translate(-50%, -50%); z-index: 1000; pointer-events: none; display: none; }
         #crosshair::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: white; border-radius: 50%; transform: translate(-50%, -50%); }
@@ -69,30 +69,30 @@
 
     <div class="absolute top-4 left-1/2 -translate-x-1/2 w-[94%] max-w-lg glass rounded-2xl p-4">
         <div class="flex justify-between items-center mb-1">
-            <span id="status-msg" class="text-[12px] text-orange-700 font-extrabold animate-pulse ar-text">원하는 위치를 조준하고 배치하세요</span>
+            <span id="status-msg" class="text-[12px] text-amber-400 font-extrabold animate-pulse ar-text">원하는 위치를 조준하고 배치하세요</span>
             <span id="rad-type-badge" class="text-[10px] bg-red-600 px-2 py-1 rounded text-white font-bold uppercase border border-red-800"></span>
         </div>
         
         <div class="text-center py-1">
-            <div id="dose-display" class="font-orbitron text-7xl font-bold text-green-700 leading-none tracking-tighter ar-text">0.00</div>
-            <div class="text-lg text-green-800 font-extrabold mt-1 ar-text">mSv/h</div>
+            <div id="dose-display" class="font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter ar-text">0.00</div>
+            <div class="text-lg text-green-400 font-extrabold mt-1 ar-text">mSv/h</div>
         </div>
 
         <div class="grid grid-cols-[40%_60%] gap-2 mt-3 border-t border-slate-700/50 pt-3">
             <div class="text-center">
-                <div class="text-[13px] text-slate-900 uppercase font-extrabold tracking-tighter mb-1 ar-text whitespace-nowrap">선원과의 거리</div>
-                <div id="dist-text" class="font-orbitron text-3xl text-blue-700 font-bold ar-text whitespace-nowrap">0.00 <span class="text-sm">m</span></div>
+                <div class="text-[13px] text-slate-200 uppercase font-extrabold tracking-tighter mb-1 ar-text whitespace-nowrap">선원과의 거리</div>
+                <div id="dist-text" class="font-orbitron text-3xl text-sky-300 font-bold ar-text whitespace-nowrap">0.00 <span class="text-sm">m</span></div>
             </div>
             <div class="text-center border-l border-slate-700/50">
-                <div class="text-[13px] text-slate-900 uppercase font-extrabold tracking-tighter mb-1 ar-text whitespace-nowrap">누적 피폭량</div>
-                <div id="cum-text" class="font-orbitron text-3xl text-orange-700 font-bold ar-text tracking-tighter whitespace-nowrap">0.000 <span class="text-sm">mSv</span></div>
+                <div class="text-[13px] text-slate-200 uppercase font-extrabold tracking-tighter mb-1 ar-text whitespace-nowrap">누적 피폭량</div>
+                <div id="cum-text" class="font-orbitron text-3xl text-amber-400 font-bold ar-text tracking-tighter whitespace-nowrap">0.000 <span class="text-sm">mSv</span></div>
             </div>
         </div>
     </div>
 
     <div id="manual-controls" class="absolute right-4 top-1/2 -translate-y-1/2 flex-col gap-3 pointer-events-auto hidden">
         <div class="glass p-3 rounded-2xl flex flex-col items-center gap-3 border border-sky-500/30">
-            <span class="text-[13px] text-slate-900 font-extrabold tracking-widest text-center ar-text">가상<br>이동</span>
+            <span class="text-[13px] text-sky-300 font-extrabold tracking-widest text-center ar-text">가상<br>이동</span>
             <button onclick="moveSource(-0.5)" class="w-14 h-14 bg-rose-600 rounded-full text-white font-bold active:scale-90 transition-all shadow-[0_0_15px_rgba(225,29,72,0.6)] text-[11px] leading-tight flex flex-col items-center justify-center border border-rose-800">
                 접근
             </button>
@@ -241,7 +241,7 @@ document.getElementById('place-btn').addEventListener('click', () => {
     document.getElementById('crosshair').style.display = 'none';
     document.getElementById('manual-controls').style.display = 'flex';
     
-    // (추가된 부분) 선원을 배치하면 안내 메시지를 숨김 처리합니다.
+    // 버튼 클릭 시 안내 메시지 숨기기 기능 유지
     document.getElementById('status-msg').style.display = 'none';
 });
 
@@ -384,14 +384,15 @@ function update() {
             showDangerPopup("🚨 위험: 누적 피폭량이 0.1 mSv를 초과했습니다!");
         }
 
+        // JS 선량 수치 컬러도 밝은 톤으로 매칭 업데이트
         if (currentDoseRate > baseDoseAt1m * 1.5) {
-            doseDisp.className = "font-orbitron text-7xl font-bold text-red-600 hazard-glow leading-none tracking-tighter ar-text";
+            doseDisp.className = "font-orbitron text-7xl font-bold text-red-500 hazard-glow leading-none tracking-tighter ar-text";
         } else if (currentDoseRate > baseDoseAt1m * 0.5) {
-            doseDisp.className = "font-orbitron text-7xl font-bold text-orange-600 leading-none tracking-tighter ar-text";
+            doseDisp.className = "font-orbitron text-7xl font-bold text-yellow-400 leading-none tracking-tighter ar-text";
         } else if (currentDoseRate === 0) {
-            doseDisp.className = "font-orbitron text-7xl font-bold text-slate-600 leading-none tracking-tighter ar-text";
+            doseDisp.className = "font-orbitron text-7xl font-bold text-slate-400 leading-none tracking-tighter ar-text";
         } else {
-            doseDisp.className = "font-orbitron text-7xl font-bold text-green-700 leading-none tracking-tighter ar-text";
+            doseDisp.className = "font-orbitron text-7xl font-bold text-green-400 leading-none tracking-tighter ar-text";
         }
 
         const tickInterval = Math.max(20, 1000 / (currentDoseRate * 0.5 + 1));
