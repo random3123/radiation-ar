@@ -85,7 +85,7 @@
             </div>
             <div class="text-center border-l border-slate-700/50">
                 <div class="text-[13px] text-slate-900 uppercase font-extrabold tracking-tighter mb-1 ar-text">누적 피폭량</div>
-                <div id="cum-text" class="font-orbitron text-3xl text-orange-700 font-bold ar-text">0.0000</div>
+                <div id="cum-text" class="font-orbitron text-3xl text-orange-700 font-bold ar-text">0.000 <span class="text-sm">mSv</span></div>
             </div>
         </div>
     </div>
@@ -117,7 +117,7 @@
                     <option value="lead">납 (Lead)</option>
                 </select>
             </div>
-            </div>
+        </div>
 
         <div class="flex gap-2 w-full">
             <button id="place-btn" class="w-full bg-amber-600 py-4 rounded-xl font-bold text-white shadow-lg active:scale-95 text-[14px] uppercase transition-all border border-amber-400/50">
@@ -247,7 +247,6 @@ document.getElementById('live-rad-type').addEventListener('change', (e) => {
     showToast(`방사선이 [ ${types[e.target.value]} ] 으로 변경되었습니다.`, 2000);
 });
 
-// 차폐체 설치/변경 로직 (버튼 클릭 대신 드롭다운 변경 시 즉시 실행되도록 변경)
 function updateShield() {
     shieldMaterial = document.getElementById('shield-type').value;
     const sObj = document.getElementById('shield-object');
@@ -299,7 +298,6 @@ function updateShield() {
     sObj.object3D.lookAt(camera.position); 
 }
 
-// 드롭다운 변경 이벤트에 즉시 연결
 document.getElementById('shield-type').addEventListener('change', updateShield);
 
 function moveSource(deltaDistance) {
@@ -361,7 +359,9 @@ function update() {
         const doseDisp = document.getElementById('dose-display');
         doseDisp.innerText = currentDoseRate.toFixed(2);
         document.getElementById('dist-text').innerHTML = `${dist.toFixed(2)} <span class="text-sm">m</span>`;
-        document.getElementById('cum-text').innerText = cumulativeDose.toFixed(4);
+        
+        // JS 누적 피폭량 업데이트 (소수점 셋째 자리 + 단위 표시)
+        document.getElementById('cum-text').innerHTML = `${cumulativeDose.toFixed(3)} <span class="text-sm">mSv</span>`;
 
         if (cumulativeDose >= 0.1 && !alarmTriggered) {
             alarmTriggered = true; 
@@ -382,7 +382,6 @@ function update() {
             showDangerPopup("🚨 위험: 누적 피폭량이 0.1 mSv를 초과했습니다!");
         }
 
-        // JS 선량 수치 컬러 업데이트
         if (currentDoseRate > baseDoseAt1m * 1.5) {
             doseDisp.className = "font-orbitron text-7xl font-bold text-red-600 hazard-glow leading-none tracking-tighter ar-text";
         } else if (currentDoseRate > baseDoseAt1m * 0.5) {
