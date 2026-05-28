@@ -20,7 +20,7 @@
             box-shadow: 0 0 20px rgba(0,0,0,0.3); 
         }
 
-        /* (추가) AR 환경에서 카메라 배경(밝거나 어두움)에 상관없이 글씨가 무조건 잘 보이게 하는 흰색 테두리 효과 */
+        /* AR 환경에서 카메라 배경에 상관없이 글씨가 잘 보이게 하는 흰색 테두리 효과 */
         .ar-text {
             text-shadow: 0 0 3px rgba(255, 255, 255, 0.9), 0 0 6px rgba(255, 255, 255, 0.9);
         }
@@ -80,7 +80,7 @@
 
         <div class="grid grid-cols-2 gap-4 mt-3 border-t border-slate-700/50 pt-3">
             <div class="text-center">
-                <div class="text-[10px] text-slate-900 uppercase font-extrabold tracking-tighter mb-1 ar-text">선원과의 물리적 거리</div>
+                <div class="text-[10px] text-slate-900 uppercase font-extrabold tracking-tighter mb-1 ar-text">선원과의 거리</div>
                 <div id="dist-text" class="font-orbitron text-3xl text-blue-700 font-bold ar-text">0.00 <span class="text-sm">m</span></div>
             </div>
             <div class="text-center border-l border-slate-700/50">
@@ -117,10 +117,7 @@
                     <option value="lead">납 (Lead)</option>
                 </select>
             </div>
-            <button id="shield-btn" class="w-full bg-indigo-600 py-3 rounded-xl font-bold text-white shadow-lg active:scale-95 text-[13px] uppercase transition-all">
-                🛡️ 선택한 차폐체를 1m 앞에 설치/변경
-            </button>
-        </div>
+            </div>
 
         <div class="flex gap-2 w-full">
             <button id="place-btn" class="w-full bg-amber-600 py-4 rounded-xl font-bold text-white shadow-lg active:scale-95 text-[14px] uppercase transition-all border border-amber-400/50">
@@ -250,14 +247,8 @@ document.getElementById('live-rad-type').addEventListener('change', (e) => {
     showToast(`방사선이 [ ${types[e.target.value]} ] 으로 변경되었습니다.`, 2000);
 });
 
-document.getElementById('shield-type').addEventListener('change', () => {
-    if(shieldActive || document.getElementById('shield-type').value !== 'none') {
-        document.getElementById('shield-btn').click();
-    }
-});
-
-// 차폐체 설치/변경 로직
-document.getElementById('shield-btn').addEventListener('click', () => {
+// 차폐체 설치/변경 로직 (버튼 클릭 대신 드롭다운 변경 시 즉시 실행되도록 변경)
+function updateShield() {
     shieldMaterial = document.getElementById('shield-type').value;
     const sObj = document.getElementById('shield-object');
     
@@ -277,7 +268,6 @@ document.getElementById('shield-btn').addEventListener('click', () => {
     sObj.setAttribute('visible', 'true');
     shieldActive = true;
     
-    // 기본 플레이트 박스와 라벨 텍스트 활성화 통일
     sBox.setAttribute('visible', 'true');
     sLabel.setAttribute('visible', 'true');
     
@@ -293,24 +283,24 @@ document.getElementById('shield-btn').addEventListener('click', () => {
         sBox.setAttribute('depth', '0.2'); 
         sBox.removeAttribute('material');
         sBox.setAttribute('material', 'src: #lego-texture; repeat: 4 6; opacity: 1.0; transparent: false; color: #ffffff;');
-        // 플라스틱 텍스트 줄바꿈 적용
         sLabel.setAttribute('value', 'PLASTIC\n(LEGO)'); 
         sLabel.setAttribute('color', '#ffffff');
         sLabel.setAttribute('position', '0 0 0.11'); 
         
     } else if(shieldMaterial === 'lead') { 
-        // 외부에서 불러온 lead1.png 파일 매핑 및 입체감(두께) 제거
         sBox.setAttribute('depth', '0'); 
         sBox.removeAttribute('material');
         sBox.setAttribute('material', 'src: #lead-texture; opacity: 1.0; transparent: true; color: #ffffff;');
-        // 납 차폐체 텍스트 삭제 (빈 문자열)
         sLabel.setAttribute('value', ''); 
         sLabel.setAttribute('color', '#ffffff');
         sLabel.setAttribute('position', '0 0 0.02'); 
     }
     
     sObj.object3D.lookAt(camera.position); 
-});
+}
+
+// 드롭다운 변경 이벤트에 즉시 연결
+document.getElementById('shield-type').addEventListener('change', updateShield);
 
 function moveSource(deltaDistance) {
     if (!targetLocked) return;
@@ -392,7 +382,7 @@ function update() {
             showDangerPopup("🚨 위험: 누적 피폭량이 0.1 mSv를 초과했습니다!");
         }
 
-        // JS 선량 수치 컬러 업데이트 (더 짙게 변경 및 ar-text 클래스 적용)
+        // JS 선량 수치 컬러 업데이트
         if (currentDoseRate > baseDoseAt1m * 1.5) {
             doseDisp.className = "font-orbitron text-7xl font-bold text-red-600 hazard-glow leading-none tracking-tighter ar-text";
         } else if (currentDoseRate > baseDoseAt1m * 0.5) {
