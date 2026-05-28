@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Radiation AR - Hybrid Shielding Lab</title>
+    <title>Radiation AR - Hybrid Shielding Lab (Radiation Symbol)</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
@@ -137,12 +137,26 @@
 
     <a-camera id="main-camera" position="0 1.6 0"></a-camera>
 
-    <a-entity id="radiation-source" visible="false">
-        <a-sphere radius="0.1" color="#ff0000" material="emissive: #ff0000; emissiveIntensity: 3"
-                  animation="property: scale; from: 1 1 1; to: 1.2 1.2 1.2; dir: alternate; loop: true; dur: 500">
-        </a-sphere>
-        <a-text id="source-label" value="" align="center" position="0 0.35 0" color="#ff4444" scale="0.6 0.6 0.6"></a-text>
-        <a-ring radius-inner="0.13" radius-outer="0.17" color="#ff0000" material="opacity: 0.8; side: double"
+    <a-entity id="radiation-source" visible="false"
+              animation="property: scale; from: 1 1 1; to: 1.2 1.2 1.2; dir: alternate; loop: true; dur: 500">
+        
+        <a-circle radius="0.1" color="#fcd34d" material="emissive: #fcd34d; emissiveIntensity: 2; side: double; transparent: false; opacity: 1">
+        </a-circle>
+        
+        <a-circle radius="0.1" color="#000000" theta-start="0" theta-length="60" position="0 0 0.001" rotation="0 0 -30">
+        </a-circle>
+        <a-circle radius="0.1" color="#000000" theta-start="0" theta-length="60" position="0 0 0.001" rotation="0 0 90">
+        </a-circle>
+        <a-circle radius="0.1" color="#000000" theta-start="0" theta-length="60" position="0 0 0.001" rotation="0 0 210">
+        </a-circle>
+        
+        <a-circle radius="0.02" color="#000000" position="0 0 0.002">
+        </a-circle>
+        
+        <a-text id="source-label" value="" align="center" position="0 0.35 0" color="#000000" scale="0.6 0.6 0.6">
+        </a-text>
+        
+        <a-ring radius-inner="0.11" radius-outer="0.14" color="#fcd34d" material="opacity: 0.8; side: double; emissive: #fcd34d; emissiveIntensity: 1"
                 animation__scale="property: scale; from: 1 1 1; to: 5 5 5; loop: true; dur: 1500; easing: linear"
                 animation__opacity="property: material.opacity; from: 0.8; to: 0; loop: true; dur: 1500; easing: linear">
         </a-ring>
