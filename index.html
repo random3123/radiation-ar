@@ -277,20 +277,20 @@ function updateShield() {
     sLabel.setAttribute('visible', 'true');
     
     if(shieldMaterial === 'paper') { 
-        sBox.setAttribute('depth', '0.1'); 
+        sBox.setAttribute('depth', '0.03'); // 기존 0.1에서 30% 수준인 0.03으로 축소
         sBox.removeAttribute('material'); 
         sBox.setAttribute('material', 'src: #paper-texture; repeat: 1 3; opacity: 0.95; transparent: true; color: #ffffff;');
         sLabel.setAttribute('value', 'PAPER'); 
         sLabel.setAttribute('color', '#1e293b'); 
-        sLabel.setAttribute('position', '0 0 0.055'); 
+        sLabel.setAttribute('position', '0 0 0.02'); // 줄어든 두께에 맞춰 글자 중심축 재설정 (0.03 / 2 + 0.005)
         
     } else if(shieldMaterial === 'plastic') { 
-        sBox.setAttribute('depth', '0.2'); 
+        sBox.setAttribute('depth', '0.1'); // 기존 0.2에서 50% 수준인 0.1로 축소
         sBox.removeAttribute('material');
         sBox.setAttribute('material', 'src: #lego-texture; repeat: 4 6; opacity: 1.0; transparent: false; color: #ffffff;');
         sLabel.setAttribute('value', 'PLASTIC\n(LEGO)'); 
         sLabel.setAttribute('color', '#ffffff');
-        sLabel.setAttribute('position', '0 0 0.11'); 
+        sLabel.setAttribute('position', '0 0 0.06'); // 줄어든 두께에 맞춰 글자 중심축 재설정 (0.1 / 2 + 0.01)
         
     } else if(shieldMaterial === 'lead') { 
         sBox.setAttribute('depth', '0'); 
